@@ -35,7 +35,7 @@ from .entry import (
     trajectories,
     wrap,
 )
-from .geom import Grid, visibility
+from .geom import Grid, los_boxes, visibility
 from .room import Room
 from .team import Operator, default_team
 
@@ -43,6 +43,9 @@ SETTLE = 0.4  # s the team holds after arriving at the stack
 CLEAR_HOLD = 1.0  # s held after the last move of an entry
 CORRIDOR_W = 2.2  # rooms narrower than this are entered with the corridor technique
 WATCH_R = 3.5  # m, open doors of uncleared rooms closer than this are watched while moving
+OPEN_TIME = 0.8  # s to open a closed door before #1 can move (no breaching modelled)
+# Apartments: every person must be identified before it may be engaged (review R1)
+APT_CFG = dataclasses.replace(EVAL_CFG, id_time=0.4)
 
 # catalog ids that make sense inside apartments (no pie arcs in narrow hallways)
 TECHNIQUES = ["crisscross", "buttonhook", "combination-cross", "two-man", "limited", "deliberate"]
@@ -132,6 +135,7 @@ class Episode:
     pos: np.ndarray  # (T, n, 2) world
     gaze: np.ndarray  # (T, n)
     steps: list[dict] = field(default_factory=list)  # objectives with start/end time
+    door_open: dict[int, float] = field(default_factory=dict)  # door index -> time it opens
 
 
 def door_xy(d: Door) -> np.ndarray:
@@ -176,6 +180,7 @@ def run_clearing(
     cur = None
     cur_gaze = np.zeros(n)
     t_now = 0.0
+    door_open: dict[int, float] = {}
     for k, door in objectives(ap):
         name = ap.fp.regions[k][0]
         fr = Frame(ap, door)
@@ -243,6 +248,13 @@ def run_clearing(
                 g += float(np.clip(wrap(tgt - g), -0.4, 0.4))
                 g_tr[s, i] = g
         # ---- entry with the playbook, in the local frame ----
+        di = ap.doors.index(door)
+        t_entry = t_now + nt * DT
+        if door.closed:
+            pb = Playbook(
+                pb.name, [dataclasses.replace(o, delay=o.delay + OPEN_TIME) for o in pb.ops]
+            )
+        door_open[di] = t_entry
         pos_l, gaze_l, phase = trajectories(room, team, pb)
         moving = np.any(np.abs(np.diff(pos_l, axis=0)) > 1e-6, axis=(1, 2)) | np.any(
             np.diff(phase, axis=0) != 0, axis=1
@@ -273,7 +285,9 @@ def run_clearing(
     tail = int(round(2.0 / DT))
     pos_chunks.append(np.repeat(cur[None], tail, 0))
     gaze_chunks.append(np.repeat(cur_gaze[None], tail, 0))
-    return Episode(technique, np.concatenate(pos_chunks), np.concatenate(gaze_chunks), steps)
+    return Episode(
+        technique, np.concatenate(pos_chunks), np.concatenate(gaze_chunks), steps, door_open
+    )
 
 
 def evaluate_episode(
@@ -282,19 +296,35 @@ def evaluate_episode(
     grid: Grid,
     vmat: np.ndarray,
     q: np.ndarray,
-    cfg: ModelCfg = EVAL_CFG,
+    cfg: ModelCfg = APT_CFG,
+    closed_masks: dict[int, np.ndarray] | None = None,
 ) -> dict:
     nt, n, _ = ep.pos.shape
     m = len(q)
-    vis = vmat[grid.see_index(ep.pos)]  # (T, n, m)
+    cells = grid.see_index(ep.pos)
+    vis = vmat[cells]  # (T, n, m)
+    for di, mask in (closed_masks or {}).items():  # closed doors block sight until opened
+        k = min(nt, int(round(ep.door_open.get(di, math.inf) / DT)) if di in ep.door_open else nt)
+        vis[:k] &= ~mask[cells[:k]]
     ang = np.arctan2(
         q[None, None, :, 1] - ep.pos[..., 1, None], q[None, None, :, 0] - ep.pos[..., 0, None]
     ).astype(np.float32)
     fov = np.abs(wrap(ang - ep.gaze[..., None].astype(np.float32))) <= cfg.half_fov
     looked = vis & fov
-    first, alive, exposure, risk, risk_multi, threat_alive = perception_and_duel(
-        vis, looked, cfg, threat_sets(ap, m, cfg)
+    dist = np.hypot(
+        q[None, None, :, 0] - ep.pos[..., 0, None], q[None, None, :, 1] - ep.pos[..., 1, None]
     )
+    first, alive, exposure, risk, risk_multi, threat_alive = perception_and_duel(
+        vis, looked, cfg, threat_sets(ap, m, cfg), dist
+    )
+    k_id = max(1, round((cfg.dwell + cfg.id_time) / DT))
+    ident = np.cumsum((looked & (dist <= cfg.id_range)).any(axis=1), axis=0) >= k_id
+    t_id = np.where(ident.any(0), ident.argmax(0), nt)
+    scen = threat_sets(ap, m, cfg)[0]  # one sampled placement, shown in the viewer
+    markers = [
+        {"x": float(q[j, 0]), "y": float(q[j, 1]), "t_detect": int(first[j]), "t_id": int(t_id[j])}
+        for j in scen
+    ]
     unc = alive.mean(1)
     done = np.nonzero(unc <= CLEAR_FRAC)[0]
     reg = ap.fp.region_of(q)
@@ -312,23 +342,43 @@ def evaluate_episode(
         "uncleared_end": round(float(unc[-1]), 4),
         "feasible": bool(done.size),
         "room_clear_s": per_room,
+        "id_time": cfg.id_time,
         "_first": first,
+        "_markers": markers,
     }
 
 
+def closed_door_masks(ap: Apartment, grid: Grid, q: np.ndarray) -> dict[int, np.ndarray]:
+    """Per closed door: (cells, points) True where the sight line passes its opening."""
+    out = {}
+    free = np.nonzero(grid.see_free)[0]
+    for di, d in enumerate(ap.doors):
+        if d.closed:
+            mk = np.zeros((len(grid.centers), len(q)), bool)
+            mk[free] = ~los_boxes(grid.centers[free], q, [d.gap])
+            out[di] = mk
+    return out
+
+
 def run(
-    seed: int, techniques: list[str], team: list[Operator] | None = None, door_watch: bool = True
+    seed: int,
+    techniques: list[str],
+    team: list[Operator] | None = None,
+    door_watch: bool = True,
+    closed_frac: float = 0.6,
 ) -> dict:
     team = team or default_team()
-    ap = generate_apartment(seed)
+    ap = generate_apartment(seed, closed_frac)
     grid = Grid(ap.fp)
     q = ap.fp.points()
     vmat = visibility(ap.fp, grid, q)
+    masks = closed_door_masks(ap, grid, q)
     replays = []
     for tech in techniques:
         ep = run_clearing(ap, team, tech, grid, door_watch)
-        met = evaluate_episode(ap, ep, grid, vmat, q)
+        met = evaluate_episode(ap, ep, grid, vmat, q, closed_masks=masks)
         first = met.pop("_first")
+        markers = met.pop("_markers")
         replays.append(
             {
                 "name": tech,
@@ -337,6 +387,8 @@ def run(
                 "pos": np.round(ep.pos, 2).tolist(),
                 "gaze": np.round(ep.gaze, 2).tolist(),
                 "first_seen": first.tolist(),
+                "markers": markers,
+                "door_open": [round(ep.door_open.get(i, -1.0), 2) for i in range(len(ap.doors))],
             }
         )
     return {
@@ -353,12 +405,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--seeds", type=int, nargs="+", default=[1])
     ap.add_argument("--techniques", nargs="+", default=["crisscross", "buttonhook", "limited"])
     ap.add_argument("--no-door-watch", action="store_true")
+    ap.add_argument("--closed", type=float, default=0.6, help="share of closed interior doors")
     ap.add_argument("--out", type=Path, default=Path("out/apartment"))
     a = ap.parse_args(argv)
     team = default_team()
     scenarios = []
     for seed in a.seeds:
-        sc = run(seed, a.techniques, team, not a.no_door_watch)
+        sc = run(seed, a.techniques, team, not a.no_door_watch, a.closed)
         scenarios.append(sc)
         print(f"{sc['room']['name']}: {[lb['name'] for lb in sc['room']['labels']]}")
         for rp in sc["replays"]:

@@ -33,3 +33,16 @@ def test_batch_matches_numpy_reference(name):
                 (f.fratricide, ref.fratricide),
             ):
                 assert x == pytest.approx(y, abs=1e-5)
+
+
+def test_identification_delay_matches_and_raises_risk():
+    from killhouse.entry import ModelCfg
+
+    room = next(r for r in standard_rooms() if r.name == "M-center")
+    pbs = doctrines(room, TEAM)
+    cfg = ModelCfg(id_time=0.4)
+    fast = fastsim.evaluate_batch(room, pbs, TEAM, cfg=cfg)
+    for pb, f in zip(pbs, fast, strict=True):
+        ref = evaluate(room, pb, TEAM, cfg=cfg)
+        assert f.risk_multi == pytest.approx(ref.risk_multi, abs=2e-2)
+        assert ref.risk_multi >= evaluate(room, pb, TEAM).risk_multi - 1e-9

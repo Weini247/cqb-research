@@ -26,6 +26,7 @@ class Floorplan:
     furniture: list[Box] = field(default_factory=list)
     regions: list[tuple[str, Box]] = field(default_factory=list)  # name, interior rect
     walkable: list[Box] = field(default_factory=list)  # areas bodies/observers may occupy at all
+    windows: list[Box] = field(default_factory=list)  # block bodies, not sight (pass-throughs)
     threat_r: float = 0.25
     point_res: float = 0.3
 
@@ -79,12 +80,12 @@ class Grid:
         ys = y0 + np.arange(self.ny) * OBS_RES
         self.centers = np.stack(np.meshgrid(xs, ys), -1).reshape(-1, 2)  # index = iy * nx + ix
 
-        def blocked(pad):
+        def blocked(pad, extra=()):
             c = self.centers
             m = np.ones(len(c), bool) if fp.walkable else np.zeros(len(c), bool)
             for bx0, by0, bx1, by1 in fp.walkable:
                 m &= ~((c[:, 0] >= bx0) & (c[:, 0] <= bx1) & (c[:, 1] >= by0) & (c[:, 1] <= by1))
-            for bx0, by0, bx1, by1 in fp.blockers:
+            for bx0, by0, bx1, by1 in list(fp.blockers) + list(extra):
                 m |= (
                     (c[:, 0] > bx0 - pad)
                     & (c[:, 0] < bx1 + pad)
@@ -94,7 +95,7 @@ class Grid:
             return m
 
         self.see_free = ~blocked(0.0)  # an observer can stand here (not inside a wall)
-        self.walk_free = ~blocked(inflate)  # a body centre can be here
+        self.walk_free = ~blocked(inflate, fp.windows)  # a body centre can be here
         self.region = fp.region_of(self.centers)
         # a body centre can round to a cell inside a wall or door leaf (0.25 m grid); such cells
         # borrow the visibility of the nearest free cell instead of being blind

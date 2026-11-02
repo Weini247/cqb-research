@@ -25,6 +25,14 @@ class Door:
     frm: int  # region on the other side (-1 = outside landing)
     hinge: int  # -1 hinge at a, +1 hinge at b
     leaf: Box | None = None
+    closed: bool = False  # closed at the start; opened by the team when it enters
+
+    @property
+    def gap(self) -> Box:
+        """The opening in the wall (blocks sight while the door is closed)."""
+        if self.side in ("bottom", "top"):
+            return (self.a, self.line - T / 2, self.b, self.line + T / 2)
+        return (self.line - T / 2, self.a, self.line + T / 2, self.b)
 
 
 @dataclass
@@ -51,8 +59,8 @@ class Apartment:
 
     def to_dict(self) -> dict:
         boxes = [[*b, "wall"] for b in self.fp.walls]
-        boxes += [[*b, "door"] for b in self.fp.doors]
         boxes += [[*b, "crate"] for b in self.fp.furniture]
+        boxes += [[*b, "window"] for b in self.fp.windows]
         return {
             "name": self.name,
             "bounds": list(self.fp.bounds),
@@ -62,6 +70,15 @@ class Apartment:
                 for n, r in self.fp.regions
             ],
             "entrance": [(self.entrance.a + self.entrance.b) / 2, 0.0],
+            "doors": [
+                {
+                    "name": d.name,
+                    "gap": [round(v, 3) for v in d.gap],
+                    "leaf": [round(v, 3) for v in d.leaf],
+                    "closed": d.closed,
+                }
+                for d in self.doors
+            ],
         }
 
 
@@ -101,8 +118,10 @@ def _leaf(door: Door, rooms: list[Box]) -> Box:
     return (x1 - dw, h, x1, h + LEAF)
 
 
-def generate_apartment(seed: int = 0) -> Apartment:
+def generate_apartment(seed: int = 0, closed_frac: float = 0.0) -> Apartment:
+    """closed_frac: probability that an interior door is closed (the entrance always is then)."""
     rng = np.random.default_rng(seed)
+    rng_doors = np.random.default_rng([seed, 7])
     W, D = _r(rng, 9.0, 12.0), _r(rng, 8.0, 11.0)
     hw = _r(rng, 1.3, 1.6, 0.05)
     xl = _r(rng, 3.2, W - 3.2 - hw)
@@ -190,7 +209,19 @@ def generate_apartment(seed: int = 0) -> Apartment:
         walls += _wall_boxes(True, s, 0.0, xl, [])
     for s in right[1:-1]:
         walls += _wall_boxes(True, s, xr, W, [])
+    windows: list[Box] = []
     if split_top is not None:
+        # pass-through between kitchen and living room: sight yes, passage no
+        kd = next(d for d in doors if d.line == split_top)
+        lo, hi = yh + T / 2 + 0.3, D - T / 2 - 0.3
+        free = [(lo, kd.a - 0.3), (kd.b + 0.3, hi)]
+        free = [(a, b) for a, b in free if b - a >= 1.0]
+        if free and rng.uniform() < 0.7:
+            a, b = max(free, key=lambda ab: ab[1] - ab[0])
+            c = (a + b) / 2
+            win = (round(c - 0.5, 3), round(c + 0.5, 3))
+            gaps[("v", split_top)].append(win)
+            windows.append((split_top - T / 2, win[0], split_top + T / 2, win[1]))
         walls += _wall_boxes(False, split_top, yh, D, gaps.get(("v", split_top), []))
     # landing in front of the entrance (stairwell), closed on three sides
     lx0, lx1, ly0 = ent_c - 2.0, ent_c + 2.0, -2.8
@@ -248,5 +279,8 @@ def generate_apartment(seed: int = 0) -> Apartment:
         furniture=furniture,
         regions=[(n, r) for (n, _), r in zip(cells, rooms, strict=True)],
         walkable=[(-T / 2, -T / 2, W + T / 2, D + T / 2), (lx0, ly0, lx1, 0.0)],
+        windows=windows,
     )
+    for d in doors:
+        d.closed = bool(closed_frac > 0 and (d.frm == -1 or rng_doors.uniform() < closed_frac))
     return Apartment(f"APT{seed}", W, D, fp, doors)

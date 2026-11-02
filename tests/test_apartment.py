@@ -57,3 +57,29 @@ def test_cli_exports_viewer(tmp_path):
     assert data["rooms"][0]["room"]["kind"] == "apartment"
     html = (tmp_path / "viewer3d.html").read_text(encoding="utf-8")
     assert "/*__DATA__*/null" not in html and '"boxes"' in html
+
+
+def test_closed_doors_block_sight_until_opened():
+    from killhouse.clearing import closed_door_masks, run
+
+    ap = generate_apartment(5, closed_frac=1.0)
+    assert all(d.closed for d in ap.doors)
+    grid = Grid(ap.fp)
+    q = ap.fp.points()
+    masks = closed_door_masks(ap, grid, q)
+    vmat = visibility(ap.fp, grid, q)
+    ep = run_clearing(ap, default_team(), "crisscross", grid)
+    closed = evaluate_episode(ap, ep, grid, vmat, q, closed_masks=masks)
+    opened = evaluate_episode(ap, ep, grid, vmat, q)
+    assert closed["exposure"] < opened["exposure"]
+    assert set(ep.door_open) == set(range(len(ap.doors)))  # every door gets opened
+    sc = run(5, ["crisscross"], closed_frac=1.0)
+    assert sc["replays"][0]["markers"] and sc["room"]["doors"][0]["closed"]
+
+
+def test_pass_through_window_blocks_walking_not_sight():
+    ap = next(a for a in (generate_apartment(s) for s in range(12)) if a.fp.windows)
+    grid = Grid(ap.fp)
+    x0, y0, x1, y1 = ap.fp.windows[0]
+    c = grid.index(np.array([(x0 + x1) / 2, (y0 + y1) / 2]))
+    assert not grid.walk_free[c] and grid.see_free[c]

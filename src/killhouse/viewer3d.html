@@ -44,6 +44,7 @@
   <div id="metrics" class="row muted"></div>
   <div id="team" class="row"></div>
   <div class="row muted">rot = ungesicherte Bedrohungsposition · grün = gesichert · Fächer = Blickkegel</div>
+  <div class="row muted">Figuren rot/orange/grau = eine Beispiel-Platzierung: unentdeckt / entdeckt / identifiziert</div>
   <div class="row" style="color:#f3c46b;font-size:12px">Abstraktes Simulationsmodell. Technik-Namen bezeichnen
     stilisierte, nicht validierte Bewegungsmodelle, keine geprüften Einsatzverfahren.</div>
 </div>
@@ -114,6 +115,7 @@ const CANVASES = {
   floor: gridCanvas("#80858b", "#737880", "#e7e9ec"),
   wall: gridCanvas("#e6e6e3", "#cfcfcb", "#a4a4a0"),
   crate: gridCanvas("#e39a32", "#d18a28", "#a8681a"),
+  door: gridCanvas("#b9bdc4", "#a9adb4", "#8c9098"),
 };
 function gridMat(kind, sx, sy, extra = {}) {
   const t = new THREE.CanvasTexture(CANVASES[kind]);
@@ -243,6 +245,7 @@ let world = new THREE.Group(); scene.add(world);
 let wallGroup = new THREE.Group();
 let team = [], ghostTeam = [], dots = null, room = null, rep = null, ghostRep = null;
 let t = 0, playing = true, camMode = "oblique", showFov = true;
+let doorMeshes = [], markers = [];
 const RED = new THREE.Color(0xe5484d), GREEN = new THREE.Color(0x5f9c78);
 
 // scene extent in room coordinates: single room (w x d) or apartment bounds
@@ -255,9 +258,15 @@ function buildWalls() {
   world.remove(wallGroup); wallGroup = new THREE.Group(); world.add(wallGroup);
   const R = room.room, H = +$("wallh").value;
   if (R.boxes) {
-    const height = { wall: H, door: Math.min(2.0, H), crate: Math.min(1.8, H) };
+    const height = { wall: H, door: Math.min(2.0, H), crate: Math.min(1.8, H), window: Math.min(1.0, H) };
     R.boxes.forEach(([x0, y0, x1, y1, kind]) =>
-      wallGroup.add(box(x0, y0, x1, y1, 0, height[kind], kind === "door" ? "wall" : kind)));
+      wallGroup.add(box(x0, y0, x1, y1, 0, height[kind], kind === "door" || kind === "window" ? "wall" : kind)));
+    doorMeshes = (R.doors || []).map(d => {
+      const panel = box(...d.gap, 0, Math.min(2.0, H), "door");
+      const leaf = box(...d.leaf, 0, Math.min(2.0, H), "door");
+      wallGroup.add(panel, leaf);
+      return { d, panel, leaf };
+    });
     return;
   }
   const w = R.w, d = R.d, [dx0, dx1] = R.door;
@@ -341,6 +350,13 @@ function loadTech(k) {
   ghostRep = gk >= 0 && gk !== k ? room.replays[gk] : null;
   ghostTeam = spawn(ghostTeam, true);
   ghostTeam.forEach(m => { m.g.visible = !!ghostRep; });
+  markers.forEach(mk => world.remove(mk.mesh));
+  markers = (rep.markers || []).map(mk => {
+    const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.3, 6, 12),
+      new THREE.MeshStandardMaterial({ color: 0xd64045, roughness: 0.6 }));
+    mesh.position.set(mk.x, 0.85, -mk.y); mesh.castShadow = true; world.add(mesh);
+    return { ...mk, mesh };
+  });
   const m = rep.metrics;
   const OBJ = D.config.objective || "risk";
   const tc = m.t_clear == null ? "–" : m.t_clear.toFixed(1) + " s";
@@ -393,6 +409,13 @@ function frame(now) {
   const k = pose(team, rep, tc, playing ? dt : 0);
   if (ghostRep) pose(ghostTeam, ghostRep, tc, playing ? dt : 0);
   rep.first_seen.forEach((fs, j) => dots.setColorAt(j, k < fs ? RED : GREEN));
+  doorMeshes.forEach(({ d, panel, leaf }, i) => {
+    const to = rep.door_open ? rep.door_open[i] : -1;
+    const open = !d.closed || (to >= 0 && tc >= to);
+    panel.visible = !open; leaf.visible = open;
+  });
+  markers.forEach(mk => mk.mesh.material.color.setHex(
+    k < mk.t_detect ? 0xd64045 : k < mk.t_id ? 0xf3a712 : 0x8a919c));
   dots.instanceColor.needsUpdate = true;
   if (camMode === "follow") {
     const c = new THREE.Vector3(); team.forEach(m => c.add(m.g.position)); c.multiplyScalar(1 / team.length);

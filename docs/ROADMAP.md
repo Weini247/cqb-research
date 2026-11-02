@@ -56,10 +56,14 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
 - ⏳ weiche, differenzierbare Sicht- und Blickfunktionen für Gradientenoptimierung
 - ⏳ Wohnungs-Episoden auf der GPU
 
-### 2b · Umstände: Türen, Fenster, Personen ⏳
-- geschlossene Türen (Öffnen kostet Zeit, Anschlag erkennen), Fenster als Sichtlinien
-- neutrale Personen: Entdecken, Identifizieren, Fehlidentifizieren als getrennte Ereignisse
-- Bedrohungen und Personen im Viewer sichtbar (neutral markiert); später bewegliche Gegner, Treppen
+### 2b · Umstände: Türen, Fenster, Personen ✅ (v1)
+- ✅ geschlossene Türen (Anteil einstellbar, Standard 60 %, Wohnungstür immer): blockieren Sicht bis zum
+  Öffnen, Öffnen kostet 0,8 s vor dem Eintritt; Viewer zeigt Türblätter auf/zu
+- ✅ Durchreiche Küche–Wohnzimmer: Sicht ja, Durchgang nein
+- ✅ Identifizieren vor Bekämpfen (`id_time` 0,4 s, ≤ 6 m), in Wohnungen Standard, GPU-Version gleich
+- ✅ Viewer: Beispiel-Platzierung als Figuren (unentdeckt / entdeckt / identifiziert)
+- ⏳ Fehlidentifikation, Unbeteiligte als eigene Klasse, bewegliche Gegner, Außenfenster, Treppen
+- Vereinfachung: Solange eine Tür zu ist, wirft ihr (geöffnetes) Blatt trotzdem Schatten in der Sicht-Vorberechnung
 
 ### 5 · Robustheit und Gegner ⏳
 - Robustheitsstudie: Sind optimierte Strategien fragil, Doktrinen robust?

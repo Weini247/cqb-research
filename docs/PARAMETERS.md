@@ -25,6 +25,9 @@ one.
 | threat reaction | 0.3 s | F | Context-dependent (detection + decision + motor). Response times measured in police cadet studies (e.g. Heusler & Sutter 2022) are higher; an armed person raising a weapon is reported in secondary literature at about 0.36 s (primary source not yet identified) | 0.15 / 0.6 / 1.0 s |
 | threat hit rate | 1/s | F | only relative results are meaningful | 0.5 / 2 /s |
 | engagement rate | 4/s per aiming operator | F | as above | 2 / 8 /s |
+| door opening time | 0.8 s | F | no breaching modelled | missing |
+| closed interior doors | 60 % | F | scenario choice | --closed |
+| identification | +0.4 s in the cone within 6 m (apartments) | F | detection ≠ identification (review R1) | missing |
 | threats per scenario | 2 (32 placements) | F | stress case | missing: 1 vs 2 vs 3 |
 | small-room rule | < 4.5 m wide -> only #1/#2 enter | F | review R1: no established threshold, creates an artificial discontinuity | 3.5 / 5.5 m |
 | corner-fed rule | door centre < 1.6 m from the side wall | F | own adaptation | missing |

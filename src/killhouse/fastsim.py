@@ -175,7 +175,12 @@ def evaluate_batch(
     sees = vis.any(2)
     ready = torch.cumsum(sees.int(), 1) >= max(1, round(cfg.threat_react / DT))
     h = torch.where(ready & sees, 1 - math.exp(-cfg.threat_rate * DT), 0.0)
-    engaged = looked.sum(2).float() * (~alive)
+    identified = ~alive
+    if cfg.id_time > 0:
+        dist = torch.hypot(qx - px, qy - py)
+        k_id = max(1, round((cfg.dwell + cfg.id_time) / DT))
+        identified = torch.cumsum((looked & (dist <= cfg.id_range)).any(2).int(), 1) >= k_id
+    engaged = looked.sum(2).float() * identified
     qe = 1 - torch.exp(-cfg.engage_rate * DT * engaged)
     surv = torch.cumprod((1 - h) * (1 - qe), 1)
     before = torch.cat([torch.ones_like(surv[:, :1]), surv[:, :-1]], 1)
@@ -185,7 +190,7 @@ def evaluate_batch(
 
     idx = torch.tensor(threat_sets(room, m, cfg), device=dev)  # (S,K)
     k_n = idx.shape[1]
-    lk = looked[..., idx] & (~alive)[:, :, idx][:, :, None]  # (P,T,n,S,K)
+    lk = looked[..., idx] & identified[:, :, idx][:, :, None]  # (P,T,n,S,K)
     hh = h[:, :, idx]  # (P,T,S,K)
     a = torch.ones(hh.shape[0], *idx.shape, device=dev)
     u = torch.ones(hh.shape[0], idx.shape[0], device=dev)

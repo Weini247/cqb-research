@@ -39,6 +39,8 @@ class ModelCfg:
     engage_rate: float = 4.0  # 1/s neutralization rate per operator aiming at a detected threat
     n_threats: int = 2  # threats per scenario for the multi-threat risk
     n_scenarios: int = 32  # sampled threat placements (common random numbers per room)
+    id_time: float = 0.0  # s of extra attention needed to identify a person before engaging
+    id_range: float = 6.0  # m, identification only within this distance
     scenario_salt: int = 0  # 0 = planning scenarios (optimizer); EVAL_CFG uses held-out ones
 
 
@@ -225,7 +227,7 @@ def multi_threat_risk(looked, detected, h, idx, engage_rate) -> float:
     return float(1 - u.mean())
 
 
-def perception_and_duel(vis, looked, cfg: ModelCfg, threat_idx):
+def perception_and_duel(vis, looked, cfg: ModelCfg, threat_idx, dist=None):
     """Detection (dwell), exposure and the duel risks from (T,n,m) visibility arrays."""
     nt, _, m = vis.shape
     seen = np.cumsum(looked.any(axis=1), axis=0) >= max(1, round(cfg.dwell / DT))
@@ -238,13 +240,18 @@ def perception_and_duel(vis, looked, cfg: ModelCfg, threat_idx):
     sees = vis.any(axis=1)
     ready = np.cumsum(sees, axis=0) >= max(1, round(cfg.threat_react / DT))
     h = np.where(ready & sees, 1 - math.exp(-cfg.threat_rate * DT), 0.0)
-    engaged = looked.sum(axis=1) * ~alive
+    identified = ~alive
+    if cfg.id_time > 0:
+        idl = looked & (dist <= cfg.id_range) if dist is not None else looked
+        k_id = max(1, round((cfg.dwell + cfg.id_time) / DT))
+        identified = np.cumsum(idl.any(axis=1), axis=0) >= k_id
+    engaged = looked.sum(axis=1) * identified
     q = 1 - np.exp(-cfg.engage_rate * DT * engaged)
     surv = np.cumprod((1 - h) * (1 - q), axis=0)
     before = np.vstack([np.ones((1, m)), surv[:-1]])  # threat active and team unhurt
     risk = float((before * h).sum(0).mean())
     hit_free = np.cumprod(1 - h, axis=0)[-1]
-    risk_multi = multi_threat_risk(looked, ~alive, h, threat_idx, cfg.engage_rate)
+    risk_multi = multi_threat_risk(looked, identified, h, threat_idx, cfg.engage_rate)
     threat_alive = float((np.prod(1 - q, axis=0) * hit_free).mean())
     return first, alive, exposure, risk, risk_multi, threat_alive
 
@@ -297,8 +304,9 @@ def evaluate(
     ang = np.arctan2(q[None, :, 1] - p[:, 1, None], q[None, :, 0] - p[:, 0, None])
     fov = np.abs(wrap(ang.reshape(NT, n, m) - gaze[..., None])) <= cfg.half_fov
     looked = vis & fov
+    dist = np.hypot(q[None, :, 0] - p[:, 0, None], q[None, :, 1] - p[:, 1, None]).reshape(NT, n, m)
     first, alive, exposure, risk, risk_multi, threat_alive = perception_and_duel(
-        vis, looked, cfg, threat_sets(room, m, cfg)
+        vis, looked, cfg, threat_sets(room, m, cfg), dist
     )
     unc = alive.mean(1)
     done = np.nonzero(unc <= CLEAR_FRAC)[0]
