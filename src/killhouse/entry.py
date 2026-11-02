@@ -60,6 +60,7 @@ class OpPlan:
     gaze3: float = 0.0  # gaze target while moving to / holding pod2
     hold2: float = 0.6  # s to hold the sector (gaze2) at the POD before leaving for pod2
     start: tuple[float, float] | None = None  # override of the stack position (multi-room)
+    speed: float = 1.0  # entry speed factor (deliberate clearing < 1)
 
 
 @dataclass
@@ -127,7 +128,7 @@ def _keyframes(room: Room, op: Operator, plan: OpPlan):
     """Piecewise-linear path as (times, points) plus threshold / POD arrival times."""
     p = stack_pos(room, op, plan)
     ts, ps = [0.0], [p]
-    v = op.speed_mps * ENTRY_FACTOR
+    v = op.speed_mps * ENTRY_FACTOR * plan.speed
 
     def go(q, speed):
         q = np.asarray(q, float)

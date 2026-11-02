@@ -76,6 +76,19 @@ Anpassungen, die ich selbst festgelegt habe (bitte besonders prüfen):
     Kontrolle über den Raum, etwas anderes)?
 11. Gibt es an der Darstellung etwas, das missverständlich oder unseriös wirken könnte?
 
+## 3b. Fragen zum Taktik-Katalog (`docs/TACTICS.md`)
+
+12. Einseiten-Stack mit Kombination (einer quert, einer hakt): Ist „#1 quert, #2 hakt“ die
+    übliche Reihenfolge? Wann wählt man „#1 hakt“?
+13. Zwei-Mann-Eintritt: Wann bleiben #3/#4 draußen, und was ist dann ihre Aufgabe?
+14. Deliberates Vorgehen: Sind 0,6-faches Tempo, 1,2 s Abstand und 1,0 s Eckhalten plausibel?
+15. **Befund:** Crisscross ist im Modell empfindlich für Timing-Fehler. Die beiden kreuzenden
+    Operatoren berühren sich bei Verzögerungen in der Tür. Deckt sich das mit Ihrer
+    Erfahrung im Training?
+16. **Befund:** Der dritte Operator bringt viel, der vierte wenig. Plausibel?
+17. **Flur-Disziplin:** Im Modell beobachten #3/#4 beim Vorbeigehen offene Türen ungesicherter
+    Räume (bis 3,5 m). Ist das so üblich? Wer übernimmt das?
+
 ## 4. Rückmeldung
 
 Bitte pro Frage: **stimmt / teilweise / stimmt nicht** und eine kurze Begründung. Sie werden

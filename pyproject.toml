@@ -13,6 +13,7 @@ killhouse-bench = "killhouse.bench:main"
 killhouse-sens = "killhouse.sensitivity:main"
 killhouse-3d = "killhouse.viewer3d:main"
 killhouse-apartment = "killhouse.clearing:main"
+killhouse-tactics = "killhouse.tactics:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]

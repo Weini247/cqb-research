@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import doctrine
+from . import tactics
 from .apartment import Apartment, Door, T, generate_apartment
 from .entry import (
     CLEAR_FRAC,
@@ -41,12 +41,10 @@ from .team import Operator, default_team
 SETTLE = 0.4  # s the team holds after arriving at the stack
 CLEAR_HOLD = 1.0  # s held after the last move of an entry
 CORRIDOR_W = 2.2  # rooms narrower than this are entered with the corridor technique
+WATCH_R = 3.5  # m, open doors of uncleared rooms closer than this are watched while moving
 
-TECHNIQUES = {
-    "crisscross": doctrine.crisscross,
-    "buttonhook": doctrine.buttonhook,
-    "limited-penetration": doctrine.limited_penetration,
-}
+# catalog ids that make sense inside apartments (no pie arcs in narrow hallways)
+TECHNIQUES = ["crisscross", "buttonhook", "combination-cross", "two-man", "limited", "deliberate"]
 
 
 class Frame:
@@ -135,15 +133,16 @@ class Episode:
     steps: list[dict] = field(default_factory=list)  # objectives with start/end time
 
 
+def door_xy(d: Door) -> np.ndarray:
+    c = (d.a + d.b) / 2
+    return np.array([c, d.line]) if d.side in ("bottom", "top") else np.array([d.line, c])
+
+
 def objectives(ap: Apartment) -> list[tuple[int, Door]]:
     """Entrance first, then DFS over rooms; hallway doors nearest to the entrance first."""
     ent = ap.entrance
     e = np.array([(ent.a + ent.b) / 2, 0.0])
     order, seen = [(ap.hall, ent)], {ap.hall}
-
-    def door_xy(d: Door) -> np.ndarray:
-        c = (d.a + d.b) / 2
-        return np.array([c, d.line]) if d.side in ("bottom", "top") else np.array([d.line, c])
 
     def visit(k):
         nb = [(n, d) for n, d in ap.neighbors(k) if n not in seen]
@@ -165,7 +164,11 @@ def _walk(path: list[np.ndarray], speed: float) -> tuple[np.ndarray, np.ndarray]
     return ts, pts
 
 
-def run_clearing(ap: Apartment, team: list[Operator], technique: str, grid: Grid) -> Episode:
+def run_clearing(
+    ap: Apartment, team: list[Operator], technique: str, grid: Grid, door_watch: bool = True
+) -> Episode:
+    """door_watch: while the team moves, #3/#4 aim at open doors of uncleared rooms within
+    WATCH_R instead of looking where they walk (hallway discipline)."""
     n = len(team)
     pos_chunks, gaze_chunks, steps = [], [], []
     cleared: set[int] = set()
@@ -179,9 +182,7 @@ def run_clearing(ap: Apartment, team: list[Operator], technique: str, grid: Grid
         if room.w < CORRIDOR_W:
             pb = corridor_entry(room, team)
         else:
-            pb = TECHNIQUES[technique](room, team)
-            if room.obstacles:
-                pb = doctrine.with_dead_space_step(room, team, pb, strict=True)
+            pb = tactics.build(technique, room, team, strict=True)
         stacks = fr.to_world(
             np.array([stack_pos(room, o, p) for o, p in zip(team, pb.ops, strict=True)])
         )
@@ -189,7 +190,10 @@ def run_clearing(ap: Apartment, team: list[Operator], technique: str, grid: Grid
         allowed = np.isin(grid.region, list(cleared)) | (grid.region < 0)
         ok = grid.walk_free & allowed
         if cur is not None:
-            ok &= grid.region != k
+            # stack only on the approach side of this door: its source region, or doorway
+            # cells close to the door (never a cleared room behind some other wall)
+            near = np.linalg.norm(grid.centers - door_xy(door), axis=1) < 1.5
+            ok &= (grid.region == door.frm) | ((grid.region < 0) & near)
         for i in range(n):
             c = int(grid.index(stacks[i]))
             if not ok[c]:
@@ -206,7 +210,13 @@ def run_clearing(ap: Apartment, team: list[Operator], technique: str, grid: Grid
             cur = stacks.copy()
             cur_gaze = np.arctan2(door_w[1] - cur[:, 1], door_w[0] - cur[:, 0])
         # ---- transit to the stack through cleared space ----
-        walks = [_walk(grid.astar(cur[i], stacks[i], allowed), team[i].speed_mps) for i in range(n)]
+        walks = []
+        for i in range(n):
+            try:
+                path = grid.astar(cur[i], stacks[i], allowed)
+            except RuntimeError:  # e.g. a stack spot only reachable via the hallway door watch
+                path = grid.astar(cur[i], stacks[i], grid.region != k)
+            walks.append(_walk(path, team[i].speed_mps))
         dur = max(w[0][-1] for w in walks) + SETTLE
         nt = max(1, int(round(dur / DT)))
         tt = np.arange(nt) * DT
@@ -216,9 +226,14 @@ def run_clearing(ap: Apartment, team: list[Operator], technique: str, grid: Grid
             p_tr[:, i, 0] = np.interp(tt, ts, pts[:, 0])
             p_tr[:, i, 1] = np.interp(tt, ts, pts[:, 1])
             g = cur_gaze[i]
+            watch = [door_xy(d) for d in ap.doors if d.into not in cleared and d.into != k]
             for s in range(nt):
                 v = p_tr[min(s + 1, nt - 1), i] - p_tr[s, i]
-                if np.hypot(*v) > 1e-3:
+                near = [w for w in watch if np.linalg.norm(w - p_tr[s, i]) < WATCH_R]
+                if door_watch and i >= 2 and near:
+                    w = min(near, key=lambda w: float(np.linalg.norm(w - p_tr[s, i])))
+                    tgt = math.atan2(w[1] - p_tr[s, i, 1], w[0] - p_tr[s, i, 0])
+                elif np.hypot(*v) > 1e-3:
                     tgt = math.atan2(v[1], v[0])
                 elif pb.ops[i].enter:
                     tgt = math.atan2(door_w[1] - p_tr[s, i, 1], door_w[0] - p_tr[s, i, 0])
@@ -300,7 +315,9 @@ def evaluate_episode(
     }
 
 
-def run(seed: int, techniques: list[str], team: list[Operator] | None = None) -> dict:
+def run(
+    seed: int, techniques: list[str], team: list[Operator] | None = None, door_watch: bool = True
+) -> dict:
     team = team or default_team()
     ap = generate_apartment(seed)
     grid = Grid(ap.fp)
@@ -308,7 +325,7 @@ def run(seed: int, techniques: list[str], team: list[Operator] | None = None) ->
     vmat = visibility(ap.fp, grid, q)
     replays = []
     for tech in techniques:
-        ep = run_clearing(ap, team, tech, grid)
+        ep = run_clearing(ap, team, tech, grid, door_watch)
         met = evaluate_episode(ap, ep, grid, vmat, q)
         first = met.pop("_first")
         replays.append(
@@ -333,13 +350,14 @@ def main(argv: list[str] | None = None) -> None:
 
     ap = argparse.ArgumentParser(prog="killhouse-apartment")
     ap.add_argument("--seeds", type=int, nargs="+", default=[1])
-    ap.add_argument("--techniques", nargs="+", default=list(TECHNIQUES))
+    ap.add_argument("--techniques", nargs="+", default=["crisscross", "buttonhook", "limited"])
+    ap.add_argument("--no-door-watch", action="store_true")
     ap.add_argument("--out", type=Path, default=Path("out/apartment"))
     a = ap.parse_args(argv)
     team = default_team()
     scenarios = []
     for seed in a.seeds:
-        sc = run(seed, a.techniques, team)
+        sc = run(seed, a.techniques, team, not a.no_door_watch)
         scenarios.append(sc)
         print(f"{sc['room']['name']}: {[lb['name'] for lb in sc['room']['labels']]}")
         for rp in sc["replays"]:

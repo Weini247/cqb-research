@@ -37,13 +37,14 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
 - ⏳ echte Grundrisse aus Datensätzen (Lizenz prüfen), Optimierung auf Gebäudeebene, geschlossene Türen
 - Bericht: [REPORT_APARTMENT_v0.md](REPORT_APARTMENT_v0.md)
 
-### 3 · Echte Taktiken: der Katalog ⏳
-- `docs/TACTICS.md`: jede Technik mit Quelle, Parametern, Anwendbarkeit und Review-Status
-- Stack-Varianten (Split, Heavy Side), 1–4 Personen, Kombinationen (Cross plus Hook), Limited
-  Penetration, Pie, dynamisch vs. deliberat; Flur: L-Ecke, T-Kreuzung, offene Türen passieren
-- Ausführungsfehler als Verrauschung (Timing, Position, Blick)
-- Ausbilder-Review, Runde 1 (Aufgabe für dich: Kontakt finden)
-- **Fertig, wenn:** Der Katalog ist kodiert, getestet und hat seinen Review-Status.
+### 3 · Echte Taktiken: der Katalog ✅ (bis auf Review)
+- ✅ [TACTICS.md](TACTICS.md) mit Quellen (FM 3-06.11, CALL 97-20, Praxisliteratur), Status pro Technik
+- ✅ 8 Techniken: Crisscross, Buttonhook, Kombination (Cross- oder Hook-first, Einseiten-Stack),
+  Zwei-Mann, Limited Penetration, Pie + Crisscross, deliberat; Teams mit 2–4 Personen
+- ✅ Ausführungsfehler (Timing, Position, Blick, Tempo) und Robustheitsbewertung
+- ✅ Flur-Disziplin (offene Türen beim Passieren überwachen), Katalog in Wohnungen nutzbar
+- ⏳ Ausbilder-Review, Runde 1 (Aufgabe für dich; Fragen 12–17 im Prüfpaket ergänzt)
+- ⏳ L-Ecke und T-Kreuzung (braucht einen Generator für Flurkreuzungen), geschlossene Türen
 
 ### 4 · Schneller Simulator (Idee 6) ⏳
 - PyTorch auf der GPU (CUDA 12.6 auf der 1070 Ti; JAX läuft unter Windows nicht nativ):

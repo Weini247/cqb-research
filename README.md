@@ -14,6 +14,8 @@ results: [E0](docs/REPORT_E0.md) (exposure model) and
   gaze with turn-rate limit, pie slicing) -> trajectories -> duel risk, exposure, time to
   clear, collision, wall, fratricide
 - `doctrine.py`: stylized crisscross, buttonhook, pie + crisscross, limited penetration
+- `tactics.py`: tactic catalog with sources and review status ([TACTICS.md](docs/TACTICS.md)),
+  team sizes 2-4, execution noise and robustness evaluation (`killhouse-tactics`)
 - `optimize.py`: cross-entropy search in the same 36-dim plan space, Pareto archive, gap metric
 - `sensitivity.py`: one-at-a-time robustness of the doctrine ranking (8 model/geometry axes)
 - `bench.py` + `report.html`: results JSON and a self-contained report (Pareto plot +
