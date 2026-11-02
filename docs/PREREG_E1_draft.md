@@ -31,8 +31,9 @@ the size of the gap?
 
 ## 4. Procedure
 
-For each confirmatory room: evaluate the four playbooks; run CEM (30 iterations x 32 samples x
-4 weights, seeded with the playbooks) with optimizer seeds 0, 1, 2; build the archive per
+For each confirmatory room: evaluate the four playbooks; run CEM (budget to be fixed after the
+fast simulator, at least 30 iterations x 32 samples x 4 weights, seeded with the playbooks;
+precondition: search saturation, i.e. the front changes < 2 % over the last 25 % of iterations) with optimizer seeds 0, 1, 2; build the archive per
 seed. Gap per technique and room = relative reduction of `risk_multi` at equal-or-better
 `t_clear` and fratricide (`gap_risk`). The reported gap is the median over the 3 seeds.
 
@@ -67,3 +68,5 @@ scope, stylized playbooks.
 
 - 2026-11-02: first draft after the E1 pilot (multi-threat objective, dead-space step,
   room generator).
+- 2026-11-02: pilot (REPORT_E1_pilot.md) showed an under-budgeted search in large rooms; the
+  confirmatory budget is now tied to a saturation check.

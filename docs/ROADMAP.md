@@ -21,11 +21,11 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
 
 ## Etappen
 
-### 1 · Einzelraum-Studie abschließen 🔄
+### 1 · Einzelraum-Studie abschließen ✅
 - ✅ Modell, 4 Doktrinen, Optimierer, Bedrohungsmodell (eine und mehrere Bedrohungen),
   toter Winkel, Raumgenerator, Sensitivität, 2D-Report, 3D-Viewer
 - ✅ Ausbilder-Prüfpaket ([SME_REVIEW.md](SME_REVIEW.md)), Präregistrierungs-Entwurf
-- 🔄 Pilotlauf mit dem Ziel `risk_multi`, Bericht aktualisieren
+- ✅ Pilotlauf mit dem Ziel `risk_multi`: [REPORT_E1_pilot.md](REPORT_E1_pilot.md)
 - **Fertig, wenn:** Bericht E1-Pilot steht, Prüfpaket kann verschickt werden.
 
 ### 2 · Mehrere Räume: die Wohnung ⏳

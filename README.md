@@ -4,7 +4,8 @@
 A simulation study of coordinated multi-agent search under visibility constraints, with
 close-quarters room entry as the case study. Research concept: [docs/CONCEPT.md](docs/CONCEPT.md),
 results: [E0](docs/REPORT_E0.md) (exposure model) and
-[E1 draft](docs/REPORT_E1_draft.md) (duel threat model, sensitivity analysis).
+[E1 draft](docs/REPORT_E1_draft.md) (duel threat model, sensitivity analysis),
+[E1 pilot](docs/REPORT_E1_pilot.md) (several threats, dead space). Plan: [ROADMAP](docs/ROADMAP.md).
 
 ## Entry benchmark (single room)
 
