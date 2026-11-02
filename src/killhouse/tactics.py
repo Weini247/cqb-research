@@ -28,6 +28,14 @@ FM_3_06_11 = (
 )
 CALL_97_20 = "CALL Newsletter 97-20, battle drill 'Enter building / clear room' (US Army, 1997)"
 PRACTITIONER = "public practitioner material (police/military training articles and courses)"
+MCWP_A = (
+    "MCWP 3-35.3 Military Operations on Urbanized Terrain (USMC, 1998; now MCRP 12-10B.1), "
+    "app. A: buttonhook and pieing described; review R2 cites §19e (pieing, p. A-30), "
+    "§20e/f (buttonhook / cross method, p. A-34), page numbers not yet checked by us"
+)
+FM_TEAMS = "FM 3-06.11 (2002) para. 3-22d-e, table 3-1: two- and three-man variants (per review R2)"
+# status vocabulary: "adapted" (geometry/timing are own choices, the concept is sourced),
+# "model variant" (own combination or naming), "unsourced" (no verified primary source yet)
 
 SPLIT = [(-1, 0), (1, 0), (-1, 1), (1, 1)]
 LEFT = [(-1, 0), (-1, 1), (-1, 2), (-1, 3)]
@@ -42,7 +50,7 @@ class Tactic:
     min_team: int
     build: Callable[[Room, list[Operator]], Playbook]
     sources: tuple[str, ...]
-    status: str  # "coded from source" / "adapted" / "SME confirmed"
+    status: str  # "adapted" / "model variant" / "unsourced" / "SME confirmed"
     note: str = ""
 
 
@@ -112,8 +120,8 @@ CATALOG: list[Tactic] = [
         "split",
         2,
         crisscross,
-        (FM_3_06_11, CALL_97_20),
-        "coded from source",
+        (MCWP_A, FM_3_06_11, CALL_97_20),
+        "adapted",
         "#1/#2 cross through the doorway to the opposite near corners",
     ),
     Tactic(
@@ -123,8 +131,8 @@ CATALOG: list[Tactic] = [
         "split",
         2,
         buttonhook,
-        (FM_3_06_11, CALL_97_20),
-        "coded from source",
+        (MCWP_A, FM_3_06_11, CALL_97_20),
+        "adapted",
         "#1/#2 hook around the frame and stay on their own side",
     ),
     Tactic(
@@ -135,8 +143,8 @@ CATALOG: list[Tactic] = [
         2,
         combination_cross_first,
         (FM_3_06_11, PRACTITIONER),
-        "adapted",
-        "single-side stack; #1 crosses, #2 hooks; #3/#4 alternate",
+        "model variant",
+        "single-side stack; #1 crosses, #2 hooks; #3/#4 alternate (project name)",
     ),
     Tactic(
         "combination-hook",
@@ -146,8 +154,8 @@ CATALOG: list[Tactic] = [
         2,
         combination_hook_first,
         (FM_3_06_11, PRACTITIONER),
-        "adapted",
-        "single-side stack; #1 hooks, #2 crosses",
+        "model variant",
+        "single-side stack; #1 hooks, #2 crosses (project name)",
     ),
     Tactic(
         "two-man",
@@ -156,7 +164,7 @@ CATALOG: list[Tactic] = [
         "split",
         2,
         two_man_crisscross,
-        (FM_3_06_11,),
+        (FM_TEAMS,),
         "adapted",
         "only #1/#2 enter, #3/#4 hold outside / rear security",
     ),
@@ -168,7 +176,7 @@ CATALOG: list[Tactic] = [
         2,
         limited_penetration,
         (PRACTITIONER,),
-        "adapted",
+        "unsourced",
         "one step in beside the frame, clear from the threshold",
     ),
     Tactic(
@@ -178,9 +186,9 @@ CATALOG: list[Tactic] = [
         "split",
         2,
         pie_crisscross,
-        (PRACTITIONER,),
-        "adapted",
-        "#1 slices the pie from outside, then dynamic crisscross",
+        (MCWP_A, PRACTITIONER),
+        "model variant",
+        "#1 slices the pie from outside (sourced component), then crisscross (own combination)",
     ),
     Tactic(
         "deliberate",
@@ -190,8 +198,8 @@ CATALOG: list[Tactic] = [
         2,
         deliberate,
         (FM_3_06_11, PRACTITIONER),
-        "adapted",
-        "pie, then slow entry (0.6x), 1.2 s spacing, 1.0 s corner hold",
+        "model variant",
+        "project name; pie, then slow entry (0.6x), 1.2 s spacing, 1.0 s hold (all free values)",
     ),
 ]
 BY_ID = {t.id: t for t in CATALOG}
@@ -244,17 +252,20 @@ def robust_eval(room, pb, team, k=16, nz: Noise | None = None, seed=0, key="risk
     """Risk under execution noise: mean and 90th percentile over k perturbed executions."""
     nz = nz or Noise()
     rng = np.random.default_rng(seed)
-    vals, valid, unseen = [], 0, 0
+    vals, ok, unseen = [], [], 0
     for _ in range(k):
         res = evaluate(room, perturb(pb, room, rng, nz), team, cfg=EVAL_CFG)
         vals.append(res.objective(key))
-        valid += res.feasible
+        ok.append(res.feasible)
         unseen += res.uncleared_end > 0.005
-    v = np.array(vals)
+    v, ok = np.array(vals), np.array(ok)
     return {
-        "mean": round(float(v.mean()), 4),
+        "n": k,
+        "n_valid": int(ok.sum()),
+        "mean": round(float(v.mean()), 4),  # all executions (incl. invalid ones)
         "p90": round(float(np.quantile(v, 0.9)), 4),
-        "valid_frac": round(valid / k, 3),
+        "mean_valid": round(float(v[ok].mean()), 4) if ok.any() else None,  # valid ones only
+        "valid_frac": round(float(ok.mean()), 3),
         "unseen_frac": round(unseen / k, 3),  # executions that left threat positions unseen
     }
 

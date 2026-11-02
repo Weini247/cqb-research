@@ -60,7 +60,11 @@ has been selected on planning scenarios. The reported gap is the median over the
 | H1 | The crisscross gap is larger in corner-fed rooms (door centre <= 1.6 m from a side wall) than in centre-fed rooms. | difference of median gaps, bootstrap 95 % CI over rooms (10 000 resamples) | CI excludes 0 |
 | H2 | Crisscross has lower `risk_multi` than buttonhook. | sign test over valid rooms, one-sided | p < 0.05 and >= 70 % of rooms |
 | H3 | The ranking of the four playbooks is robust to the model axes in `sensitivity.py`. | mean Kendall tau per variant vs. baseline | tau >= 0.8 in >= 80 % of variants |
-| H4 | A four-operator entry has lower `risk_multi` than the same plan with #3/#4 outside, in rooms >= 4.5 m wide. | paired sign test over rooms x playbooks | p < 0.05 |
+| H4 | A four-operator entry has lower `risk_multi` than the same plan with #3/#4 outside, in rooms >= 4.5 m wide. | per room, the mean difference over playbooks; sign test over **rooms** (rooms are the independent unit, not room x playbook) | p < 0.05 |
+
+**Multiple testing:** H1, H2 and H4 form one family and are Holm-corrected at alpha = 0.05.
+H3 is a descriptive robustness criterion without a p-value. Rooms are the independent unit
+in every test, and seeds are averaged within a room first.
 
 All four hypotheses are reported regardless of outcome. Exploratory analyses (for example,
 descriptions of the best found strategies) are labelled as such.
@@ -86,6 +90,7 @@ scope, stylized playbooks.
   room generator).
 - 2026-11-02: pilot (REPORT_E1_pilot.md) showed an under-budgeted search in large rooms; the
   confirmatory budget is now tied to a saturation check.
+- 2026-11-02: review R2 (REVIEW_R2.md): H4 on room level, Holm correction, explicit test family.
 - 2026-11-02: methodological review R1 (REVIEW_R1.md): added scope/validity section,
   information model, separation of planning and held-out threat scenarios, parameter
   provenance (PARAMETERS.md), new sensitivity axes (dwell 0.8 s, threat reaction 1.0 s,

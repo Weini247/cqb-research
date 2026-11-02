@@ -13,7 +13,7 @@ ROOMS = {r.name: r for r in standard_rooms()}
 def test_catalog_entries_are_documented():
     assert len({t.id for t in CATALOG}) == len(CATALOG) >= 8
     for t in CATALOG:
-        assert t.sources and t.status in ("coded from source", "adapted", "SME confirmed")
+        assert t.sources and t.status in ("adapted", "model variant", "unsourced", "SME confirmed")
 
 
 @pytest.mark.parametrize("tid", [t.id for t in CATALOG])

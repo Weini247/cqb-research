@@ -42,7 +42,10 @@ yet). Reproduce: `python -m uv run killhouse-apartment --seeds 1 3 5 --out out/a
 2. **The combination with the dead-space step changes what "limited penetration" means.**
    An operator who goes back to look behind the door is effectively entering the room. The
    label must be read as "limited penetration with dead-space step".
-3. **Absolute risks are high (0.83-0.93)** because 4-6 rooms with 2 threats each accumulate.
+3. **Absolute risks are high (0.83-0.93).** Each scenario places 2 threats somewhere in
+   the *whole* apartment (32 scenarios, uniform over all threat positions), not 2 per room.
+   The high values come from long episodes and many rooms looking into the hallway.
+   (Corrected after review R2; an earlier version said "2 threats each".)
    As before, only comparisons are meaningful.
 
 ## Not yet included (next steps)

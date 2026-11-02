@@ -11,9 +11,11 @@ unvalidated movement models* that are loosely based on the cited descriptions. T
 claim to reproduce any unit's procedure, and their representativeness is a separate open
 question for an instructor review. Results are model-internal optimization findings.
 
-**Status:**
-- *coded from source*: follows a public description directly.
-- *adapted*: needed my own decisions where the source is not specific, marked below.
+**Status** (revised after review R2; no technique is "coded from source", since every
+encoding contains own geometry and timing):
+- *adapted*: the concept is in a cited source; geometry and timing are own choices.
+- *model variant*: own combination or project name; components may be sourced.
+- *unsourced*: no verified primary source yet.
 - *SME confirmed*: reviewed by an instructor. None yet; see [SME_REVIEW.md](SME_REVIEW.md).
   Review R1 ([REVIEW_R1.md](REVIEW_R1.md)) was a source-based methodological review, not an
   instructor review, and confirms no technique.
@@ -29,6 +31,10 @@ table of contents plus secondary descriptions. That check is part of the review.
   Rooms". Successor: ATTP 3-06.11 (2011).
 - **[CALL]** CALL Newsletter 97-20, battle drill "Enter building / clear room", US Army
   Center for Army Lessons Learned, 1997.
+- **[MCWP]** MCWP 3-35.3 *Military Operations on Urbanized Terrain*, USMC 1998 (now
+  MCRP 12-10B.1), app. A: buttonhook and pieing are described (our spot check). Review R2
+  cites §19e (pieing, p. A-30) and §20e/f (buttonhook / "cross method", p. A-34); we could not
+  confirm a "cross method" under that name.
 - **[PR]** Public practitioner material on room entry (police and military training
   articles, e.g. on slicing the pie vs. buttonhook).
 
@@ -36,14 +42,14 @@ table of contents plus secondary descriptions. That check is part of the review.
 
 | id | technique | stack | encoding | sources | status |
 |---|---|---|---|---|---|
-| `crisscross` | Crisscross | split | #1 and #2 start on opposite sides, cross through the doorway to the opposite near corners; #3/#4 follow to shallower positions on the opposite side of the operator ahead | FM, CALL | coded from source |
-| `buttonhook` | Buttonhook | split | #1 and #2 turn around the frame and stay on their own side, along the entry wall | FM, CALL | coded from source |
-| `combination-cross` | Combination, cross first | single side | whole team on one side; #1 crosses to the far side, #2 hooks back to the near side, #3/#4 alternate | FM, PR | adapted: role order and #3/#4 targets |
-| `combination-hook` | Combination, hook first | single side | as above, #1 hooks, #2 crosses | FM, PR | adapted |
-| `two-man` | Two-man entry | split | crisscross by #1/#2; #3/#4 hold outside (rear security) | FM | adapted: when two-man is chosen |
-| `limited` | Limited penetration | split | #1/#2 step in beside the frame and clear from the threshold, near corner first then far corner; #3/#4 outside | PR | adapted: depth 0.7 m |
-| `pie-crisscross` | Slicing the pie + crisscross | split | #1 walks an arc (r = 1.4 m) outside the door looking in, then dynamic crisscross | PR | adapted: arc radius, then crisscross |
-| `deliberate` | Deliberate entry | split | pie, then entry at 0.6x speed, 1.2 s spacing, 1.0 s corner hold, crisscross geometry | FM, PR | adapted: the numbers |
+| `crisscross` | Crisscross | split | #1 and #2 start on opposite sides, cross through the doorway to the opposite near corners; #3/#4 follow to shallower positions on the opposite side of the operator ahead | MCWP (unconfirmed: "cross method"), FM, CALL | adapted |
+| `buttonhook` | Buttonhook | split | #1 and #2 turn around the frame and stay on their own side, along the entry wall | MCWP, FM, CALL | adapted |
+| `combination-cross` | Combination, cross first | single side | whole team on one side; #1 crosses to the far side, #2 hooks back to the near side, #3/#4 alternate | FM, PR | model variant (project name; FM describes situational variants, no class of this name) |
+| `combination-hook` | Combination, hook first | single side | as above, #1 hooks, #2 crosses | FM, PR | model variant |
+| `two-man` | Two-man entry | split | crisscross by #1/#2; #3/#4 hold outside (rear security) | FM §3-22d-e (team sizes) | adapted |
+| `limited` | Limited penetration | split | #1/#2 step in beside the frame and clear from the threshold, near corner first then far corner; #3/#4 outside | PR | **unsourced** (no verified primary source yet) |
+| `pie-crisscross` | Slicing the pie + crisscross | split | #1 walks an arc (r = 1.4 m) outside the door looking in, then dynamic crisscross | MCWP (pieing component), PR | model variant (own combination) |
+| `deliberate` | Deliberate entry | split | pie, then entry at 0.6x speed, 1.2 s spacing, 1.0 s corner hold, crisscross geometry | FM, PR | model variant (project name, all numbers free) |
 
 **Geometry adaptations** (apply to all entries, see `doctrine.py`):
 - **Corner-fed doors:** the short-side operator goes straight in along the near side wall.

@@ -1,6 +1,7 @@
 # Concept: How close are established CQB room-entry techniques to the optimum?
 
-Status: exploratory (E0). Nothing here is preregistered yet; E0 exists to make the model,
+Status: exploratory. Current model version: see `docs/RUNLOG.md` (plan space 52 dimensions,
+13 per operator; primary outcome `risk_multi`). This document originally described E0. Nothing here is preregistered yet; E0 exists to make the model,
 metrics and optimizer good enough that a preregistered study (E1) is worth running.
 
 ## Research question
