@@ -101,3 +101,28 @@ def test_kendall_and_variants():
     assert kendall({"a": 1, "b": 2}, {"a": 2, "b": 1}) == -1.0
     _, rooms, _ = _variant("door_w", 1.2)
     assert all(abs((r.door_x1 - r.door_x0) - 1.2) < 1e-9 for r in rooms)
+
+
+def test_multi_threat_values_full_team():
+    room = standard_rooms()[2]  # M-center
+    pb = doctrines(room, TEAM)[0]
+    two = Playbook("2", [dataclasses.replace(o, enter=i < 2) for i, o in enumerate(pb.ops)])
+    four, pair = evaluate(room, pb, TEAM), evaluate(room, two, TEAM)
+    assert four.risk_multi < pair.risk_multi - 0.02  # a second threat needs a second gun
+    assert four.risk <= four.risk_multi
+
+
+def test_dead_space_step_clears_furniture_room():
+    room = next(r for r in standard_rooms() if r.name == "M-center-box")
+    pbs = doctrines(room, TEAM)
+    assert all(evaluate(room, pb, TEAM).feasible for pb in pbs)
+    assert all(any(o.pod2 for o in pb.ops) for pb in pbs)
+
+
+def test_generated_rooms_deterministic_and_sane():
+    from killhouse.room import generated_rooms
+
+    a, b = generated_rooms(3, 6), generated_rooms(3, 6)
+    assert a == b and len({r.name for r in a}) == 6
+    for r in a:
+        assert 0 < r.door_x0 < r.door_x1 <= r.w and len(r.points()) > 50

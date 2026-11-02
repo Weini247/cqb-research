@@ -6,6 +6,7 @@ See docs/CONCEPT.md for definitions. Everything is vectorized over time with num
 from __future__ import annotations
 
 import math
+import zlib
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -36,6 +37,8 @@ class ModelCfg:
     threat_react: float = 0.3  # s a threat needs an operator in view before it can fire
     threat_rate: float = 1.0  # 1/s hit rate of a ready, unengaged threat on the team
     engage_rate: float = 4.0  # 1/s neutralization rate per operator aiming at a detected threat
+    n_threats: int = 2  # threats per scenario for the multi-threat risk
+    n_scenarios: int = 32  # sampled threat placements (common random numbers per room)
 
 
 DEFAULT_CFG = ModelCfg()
@@ -53,6 +56,9 @@ class OpPlan:
     gaze2: float = 0.0  # gaze target at the POD (rad)
     pie: float = 0.0  # 0..1 fraction of the pie-slicing arc walked before entry
     hold: float = 0.5  # s to keep gaze1 (own corner) after reaching the POD
+    pod2: tuple[float, float] | None = None  # optional second position (clear dead space)
+    gaze3: float = 0.0  # gaze target while moving to / holding pod2
+    hold2: float = 0.6  # s to hold the sector (gaze2) at the POD before leaving for pod2
 
 
 @dataclass
@@ -64,6 +70,7 @@ class Playbook:
 @dataclass
 class Result:
     risk: float  # P(team takes a hit) for one threat at a uniformly random hidden position
+    risk_multi: float  # P(team takes a hit) with n_threats threats, one target per operator
     threat_alive: float  # P(threat still active at the horizon)
     exposure: float
     t_clear: float
@@ -75,6 +82,9 @@ class Result:
     gaze: np.ndarray | None = field(default=None, repr=False)
     first_seen: np.ndarray | None = field(default=None, repr=False)
 
+    def objective(self, key: str) -> float:
+        return float(getattr(self, key))
+
     @property
     def feasible(self) -> bool:
         """Physically valid and room cleared; fratricide is compared separately."""
@@ -83,6 +93,7 @@ class Result:
     def metrics(self) -> dict:
         return {
             "risk": round(self.risk, 4),
+            "risk_multi": round(self.risk_multi, 4),
             "threat_alive": round(self.threat_alive, 4),
             "exposure": round(self.exposure, 4),
             "t_clear": round(self.t_clear, 3),
@@ -129,7 +140,7 @@ def _keyframes(room: Room, op: Operator, plan: OpPlan):
             a = a0 + sweep * k / 6
             go(c + PIE_R * np.array([math.cos(a), math.sin(a)]), PIE_SPEED)
     if not plan.enter:
-        return np.array(ts), np.array(ps), math.inf, math.inf
+        return np.array(ts), np.array(ps), math.inf, math.inf, math.inf
     if ts[-1] < plan.delay:
         ts.append(plan.delay)
         ps.append(ps[-1])
@@ -138,7 +149,14 @@ def _keyframes(room: Room, op: Operator, plan: OpPlan):
     t_thr = ts[-1]  # gaze switches to the own corner from the approach point on
     go((xt, 0.5), v)
     go(plan.pod, v)
-    return np.array(ts), np.array(ps), t_thr, ts[-1]
+    t_pod = ts[-1]
+    if plan.pod2 is None:
+        return np.array(ts), np.array(ps), t_thr, t_pod, math.inf
+    t_leave = t_pod + plan.hold + plan.hold2
+    ts.append(t_leave)
+    ps.append(ps[-1])
+    go(plan.pod2, op.speed_mps)
+    return np.array(ts), np.array(ps), t_thr, t_pod, t_leave
 
 
 def trajectories(room: Room, team: list[Operator], pb: Playbook, cfg: ModelCfg = DEFAULT_CFG):
@@ -149,17 +167,17 @@ def trajectories(room: Room, team: list[Operator], pb: Playbook, cfg: ModelCfg =
     phase = np.zeros((NT, n), int)
     look = np.array([room.door_c, 0.6])
     for i, (op, plan) in enumerate(zip(team, pb.ops, strict=True)):
-        ts, ps, t_thr, t_pod = _keyframes(room, op, plan)
+        ts, ps, t_thr, t_pod, t_leave = _keyframes(room, op, plan)
         ts = np.maximum.accumulate(ts + np.arange(len(ts)) * 1e-9)
         pos[:, i, 0] = np.interp(t, ts, ps[:, 0])
         pos[:, i, 1] = np.interp(t, ts, ps[:, 1])
-        phase[:, i] = (t >= t_thr).astype(int) + (t >= t_pod + plan.hold)
+        phase[:, i] = (t >= t_thr).astype(int) + (t >= t_pod + plan.hold) + (t >= t_leave)
         g = math.atan2(look[1] - pos[0, i, 1], look[0] - pos[0, i, 0])
         for k in range(NT):
             if phase[k, i] == 0:
                 tgt = math.atan2(look[1] - pos[k, i, 1], look[0] - pos[k, i, 0])
             else:
-                tgt = plan.gaze1 if phase[k, i] == 1 else plan.gaze2
+                tgt = (plan.gaze1, plan.gaze2, plan.gaze3)[phase[k, i] - 1]
             diff = (tgt - g + math.pi) % (2 * math.pi) - math.pi
             g += max(-cfg.turn_rate * DT, min(cfg.turn_rate * DT, diff))
             gaze[k, i] = g
@@ -169,6 +187,35 @@ def trajectories(room: Room, team: list[Operator], pb: Playbook, cfg: ModelCfg =
 def _door_los(room: Room, a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """LOS between two operator tracks (T,2) through the entry wall only."""
     return _through_door(room, a[:, 0], a[:, 1], b[:, 0], b[:, 1])
+
+
+def threat_sets(room: Room, m: int, cfg: ModelCfg) -> np.ndarray:
+    """Fixed threat placements per room (common random numbers across all plans)."""
+    rng = np.random.default_rng(zlib.crc32(room.name.encode()))
+    k = min(cfg.n_threats, m)
+    return np.array([rng.choice(m, size=k, replace=False) for _ in range(cfg.n_scenarios)])
+
+
+def multi_threat_risk(looked, detected, h, idx, engage_rate) -> float:
+    """Several threats at once; each operator engages one detected threat per step.
+
+    looked (T,n,m): operator has the point in its cone with LOS; detected (T,m); h (T,m): per
+    step hit probability of a ready threat; idx (S,K) threat placements. Each operator aims at
+    the visible detected threat that is most likely still active, so a second or third gun is
+    what keeps a second threat from firing while the first is engaged.
+    """
+    s_n, k_n = idx.shape
+    lk = looked[:, :, idx] & detected[:, idx][:, None]  # (T,n,S,K) engageable
+    hh = h[:, idx]  # (T,S,K)
+    a = np.ones((s_n, k_n))  # P(threat still active)
+    u = np.ones(s_n)  # P(team unhurt)
+    onehot = np.eye(k_n, dtype=bool)
+    for t in np.nonzero(lk.any(axis=(1, 2, 3)) | hh.any(axis=(1, 2)))[0]:
+        score = np.where(lk[t], a[None], -1.0)
+        eng = (onehot[score.argmax(2)] & (score.max(2) > 0)[..., None]).sum(0)
+        u *= np.prod(1 - a * hh[t], axis=1)
+        a *= np.exp(-engage_rate * DT * eng)
+    return float(1 - u.mean())
 
 
 def evaluate(
@@ -203,6 +250,7 @@ def evaluate(
     before = np.vstack([np.ones((1, m)), surv[:-1]])  # threat active and team unhurt
     risk = float((before * h).sum(0).mean())
     hit_free = np.cumprod(1 - h, axis=0)[-1]
+    risk_multi = multi_threat_risk(looked, ~alive, h, threat_sets(room, m, cfg), cfg.engage_rate)
     threat_alive = float((np.prod(1 - q, axis=0) * hit_free).mean())
     unc = alive.mean(1)
     done = np.nonzero(unc <= CLEAR_FRAC)[0]
@@ -235,6 +283,7 @@ def evaluate(
             fratricide += float(mask.sum())
     res = Result(
         risk,
+        risk_multi,
         threat_alive,
         exposure,
         t_clear,

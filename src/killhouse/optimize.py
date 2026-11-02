@@ -11,11 +11,13 @@ from .entry import OpPlan, Playbook, Result, evaluate
 from .room import Room
 from .team import Operator
 
-# per operator: delay, tx, pod_x, pod_y, gaze1, gaze2, pie, enter, hold
-LO = np.array([0.0, 0, 0, 0, -math.pi, -math.pi, 0, 0, 0])
-HI = np.array([6.0, 1, 1, 1, math.pi, math.pi, 1, 1, 2])
+# per operator: delay, tx, pod_x, pod_y, gaze1, gaze2, pie, enter, hold,
+#               use_pod2, pod2_x, pod2_y, gaze3
+LO = np.array([0.0, 0, 0, 0, -math.pi, -math.pi, 0, 0, 0, 0, 0, 0, -math.pi])
+HI = np.array([6.0, 1, 1, 1, math.pi, math.pi, 1, 1, 2, 1, 1, 1, math.pi])
 PER_OP = len(LO)
-ANGLES = [4, 5]
+ANGLES = [4, 5, 12]
+OBJECTIVE = "risk_multi"
 
 
 def bounds(n: int) -> tuple[np.ndarray, np.ndarray]:
@@ -25,12 +27,15 @@ def bounds(n: int) -> tuple[np.ndarray, np.ndarray]:
 def decode(x: np.ndarray, room: Room, team: list[Operator], name: str = "found") -> Playbook:
     ops = []
     for i, op in enumerate(team):
-        dl, tx, px, py, g1, g2, pie, enter, hold = x[i * PER_OP : (i + 1) * PER_OP]
+        dl, tx, px, py, g1, g2, pie, enter, hold, use2, px2, py2, g3 = x[
+            i * PER_OP : (i + 1) * PER_OP
+        ]
         r = op.radius_m + 0.02
         pod = (r + px * (room.w - 2 * r), r + py * (room.d - 2 * r))
         s, k = SIDES[i]
         pie = pie if pie > 0.05 else 0.0
-        ops.append(OpPlan(s, k, bool(enter >= 0.5), dl, tx, pod, g1, g2, pie, hold))
+        pod2 = (r + px2 * (room.w - 2 * r), r + py2 * (room.d - 2 * r)) if use2 >= 0.5 else None
+        ops.append(OpPlan(s, k, bool(enter >= 0.5), dl, tx, pod, g1, g2, pie, hold, pod2, g3))
     return Playbook(name, ops)
 
 
@@ -41,12 +46,23 @@ def encode(pb: Playbook, room: Room, team: list[Operator]) -> np.ndarray:
         px = (p.pod[0] - r) / (room.w - 2 * r)
         py = (p.pod[1] - r) / (room.d - 2 * r)
         v += [p.delay, p.tx, px, py, p.gaze1, p.gaze2, p.pie, 1.0 if p.enter else 0.0, p.hold]
+        if p.pod2 is None:
+            v += [0.0, 0.5, 0.5, 0.0]
+        else:
+            px2 = (p.pod2[0] - r) / (room.w - 2 * r)
+            py2 = (p.pod2[1] - r) / (room.d - 2 * r)
+            v += [1.0, px2, py2, p.gaze3]
     lo, hi = bounds(len(team))
     return np.clip(np.array(v, float), lo, hi)
 
 
 def score(res: Result, w: float) -> float:
-    return res.risk + w * res.t_clear + 20 * (res.collision + res.wall) + 5 * res.fratricide
+    return (
+        res.objective(OBJECTIVE)
+        + w * res.t_clear
+        + 20 * (res.collision + res.wall)
+        + 5 * res.fratricide
+    )
 
 
 class Archive:
@@ -58,7 +74,7 @@ class Archive:
 
     def add(self, res: Result, x: np.ndarray) -> None:
         if res.feasible:
-            self.rows.append((res.risk, res.t_clear, res.fratricide))
+            self.rows.append((res.objective(OBJECTIVE), res.t_clear, res.fratricide))
             self.xs.append(x.copy())
 
     def front(self, fr_max: float = math.inf) -> list[int]:

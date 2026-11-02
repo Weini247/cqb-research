@@ -309,9 +309,10 @@ function loadTech(k) {
   ghostTeam = spawn(ghostTeam, true);
   ghostTeam.forEach(m => { m.g.visible = !!ghostRep; });
   const m = rep.metrics;
-  $("metrics").innerHTML = `Risiko <b>${m.risk.toFixed(3)}</b> · gesichert nach <b>${m.t_clear.toFixed(1)} s</b>`
+  const OBJ = D.config.objective || "risk";
+  $("metrics").innerHTML = `Risiko <b>${m[OBJ].toFixed(3)}</b> · gesichert nach <b>${m.t_clear.toFixed(1)} s</b>`
     + ` · Fratricide ${m.fratricide.toFixed(1)} s${m.feasible ? "" : " · <span style='color:#ff8a80'>ungültig</span>"}`
-    + (ghostRep ? ` · Geist: ${ghostRep.name} (R ${ghostRep.metrics.risk.toFixed(3)})` : "");
+    + (ghostRep ? ` · Geist: ${ghostRep.name} (R ${ghostRep.metrics[OBJ].toFixed(3)})` : "");
   t = 0;
 }
 

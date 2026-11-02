@@ -13,11 +13,11 @@ from pathlib import Path
 
 import numpy as np
 
-from . import entry
+from . import entry, optimize
 from .doctrine import doctrines
 from .entry import Playbook, Result, evaluate
 from .optimize import Archive, cem, decode, encode
-from .room import Room, standard_rooms
+from .room import Room, generated_rooms, standard_rooms
 from .team import default_team
 from .viewer3d import to_html as viewer3d_html
 
@@ -55,7 +55,7 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
         log(f"  {room.name} w={w}: {len(archive.rows)} valid evals ({dt:.0f}s)")
     for d in doc_out:
         if d["feasible"]:
-            d.update(archive.gap(d["risk"], d["t_clear"], d["fratricide"]))
+            d.update(archive.gap(d[optimize.OBJECTIVE], d["t_clear"], d["fratricide"]))
     # "best found" replay: knee of the front at fratricide <= the safest valid doctrine
     valid = [d for d in doc_out if d["feasible"]]
     fr_cap = min((d["fratricide"] for d in valid), default=float("inf"))
@@ -96,11 +96,21 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--quick", action="store_true", help="tiny budget for smoke tests")
     ap.add_argument("--rooms", nargs="*", help="room names (default: all)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument(
+        "--generated",
+        nargs=2,
+        type=int,
+        metavar=("SEED", "N"),
+        help="use N generated rooms from generator SEED instead of the standard set",
+    )
+    ap.add_argument("--iters", type=int, default=30)
+    ap.add_argument("--pop", type=int, default=32)
     ap.add_argument("--out", type=Path, default=Path("out/bench"))
     a = ap.parse_args(argv)
-    iters, pop = (4, 12) if a.quick else (30, 32)
+    iters, pop = (4, 12) if a.quick else (a.iters, a.pop)
     team = default_team()
-    rooms = [r for r in standard_rooms() if not a.rooms or r.name in a.rooms]
+    pool = generated_rooms(*a.generated) if a.generated else standard_rooms()
+    rooms = [r for r in pool if not a.rooms or r.name in a.rooms]
     t0 = time.perf_counter()
     results = []
     for room in rooms:
@@ -115,6 +125,9 @@ def main(argv: list[str] | None = None) -> None:
             "pop": pop,
             "weights": WEIGHTS,
             "seed": a.seed,
+            "objective": optimize.OBJECTIVE,
+            "n_threats": entry.DEFAULT_CFG.n_threats,
+            "n_scenarios": entry.DEFAULT_CFG.n_scenarios,
             "dt": entry.DT,
             "horizon": entry.HORIZON,
             "half_fov_deg": round(np.degrees(entry.HALF_FOV), 1),
@@ -140,7 +153,7 @@ def main(argv: list[str] | None = None) -> None:
         for d in r["doctrines"]:
             if d["feasible"]:
                 print(
-                    f"{r['room']['name']:14s} {d['name']:20s} {d['risk']:6.3f} "
+                    f"{r['room']['name']:14s} {d['name']:20s} {d[optimize.OBJECTIVE]:6.3f} "
                     f"{d['t_clear']:5.1f} {d['fratricide']:4.1f} {d['risk_best']:6.3f} "
                     f"{d['gap_risk'] * 100:4.0f}%"
                 )

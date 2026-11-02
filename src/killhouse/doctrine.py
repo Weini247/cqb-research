@@ -6,10 +6,13 @@ stack L, R, L, R). They are a starting point, not an authoritative rendering of 
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
-from .entry import OpPlan, Playbook, threshold_x
-from .room import Room
+import numpy as np
+
+from .entry import CLEAR_FRAC, NT, OpPlan, Playbook, evaluate, threshold_x
+from .room import Room, los
 from .team import Operator
 
 SIDES = [(-1, 0), (1, 0), (-1, 1), (1, 1)]
@@ -91,10 +94,53 @@ def limited_penetration(room: Room, team: list[Operator]) -> Playbook:
     return Playbook("limited-penetration", ops)
 
 
+def _free_cells(room: Room, r: float) -> np.ndarray:
+    xs = np.arange(r + 0.05, room.w - r - 0.05 + 1e-9, 0.5)
+    ys = np.arange(r + 0.05, room.d - r - 0.05 + 1e-9, 0.5)
+    c = np.stack(np.meshgrid(xs, ys), -1).reshape(-1, 2)
+    keep = np.ones(len(c), bool)
+    for x0, y0, x1, y1 in room.obstacles:
+        keep &= ~((c[:, 0] > x0 - r) & (c[:, 0] < x1 + r) & (c[:, 1] > y0 - r) & (c[:, 1] < y1 + r))
+    return c[keep]
+
+
+def with_dead_space_step(room: Room, team: list[Operator], pb: Playbook, k: int = 4) -> Playbook:
+    """Doctrinal "clear dead space": if the plan leaves threat positions unseen, send one
+    entered operator (preferably #3/#4) to the free spot that sees most of them, after it has
+    held its sector. Deterministic search over operator x top-k candidate spots."""
+    base = evaluate(room, pb, team, keep=True)
+    if base.uncleared_end <= CLEAR_FRAC:
+        return pb
+    q = room.points()
+    unseen = q[base.first_seen >= NT]
+    entered = [i for i, o in enumerate(pb.ops) if o.enter]
+    order = sorted(entered, key=lambda i: (pb.ops[i].slot == 0, i))  # #3/#4 first
+    best, best_key = pb, (base.uncleared_end, base.risk_multi)
+    for i in order[:2]:
+        cells = _free_cells(room, team[i].radius_m)
+        counts = los(room, cells, unseen).sum(1)
+        for c in cells[np.argsort(-counts)[:k]]:
+            vis = los(room, c[None], unseen)[0]
+            tgt = unseen[vis].mean(0) if vis.any() else unseen.mean(0)
+            ops = list(pb.ops)
+            ops[i] = dataclasses.replace(
+                ops[i], pod2=(float(c[0]), float(c[1])), gaze3=_angle(c, tgt)
+            )
+            cand = Playbook(pb.name + "+dead-space", ops)
+            res = evaluate(room, cand, team)
+            key = (max(res.uncleared_end, CLEAR_FRAC), res.risk_multi)
+            if res.collision < 0.02 and res.wall < 0.02 and key < best_key:
+                best, best_key = cand, key
+    return best
+
+
 def doctrines(room: Room, team: list[Operator]) -> list[Playbook]:
-    return [
+    out = [
         crisscross(room, team),
         buttonhook(room, team),
         crisscross(room, team, t0=3.0, pie=1.0),
         limited_penetration(room, team),
     ]
+    if room.obstacles:
+        out = [with_dead_space_step(room, team, pb) for pb in out]
+    return out

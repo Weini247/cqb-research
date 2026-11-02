@@ -88,6 +88,32 @@ def los(room: Room, p: np.ndarray, q: np.ndarray) -> np.ndarray:
     return vis
 
 
+def generated_rooms(seed: int, n: int) -> list[Room]:
+    """Random rectangular rooms for held-out evaluation: size, door position / width, 0-2 boxes."""
+    rng = np.random.default_rng(seed)
+    out = []
+    for i in range(n):
+        w = float(np.round(rng.uniform(3.0, 8.0) * 4) / 4)
+        d = float(np.round(rng.uniform(3.0, 7.0) * 4) / 4)
+        dw = float(rng.choice([0.8, 0.9, 1.0, 1.2]))
+        x0 = float(np.round((0.15 + rng.uniform() * (w - 0.3 - dw)) * 20) / 20)
+        boxes: list[Box] = []
+        for _ in range(int(rng.choice([0, 1, 2], p=[0.5, 0.35, 0.15]))):
+            for _try in range(20):
+                bw, bd = rng.uniform(0.6, 1.6), rng.uniform(0.4, 1.0)
+                bx = rng.uniform(0.3, max(0.31, w - 0.3 - bw))
+                by = rng.uniform(d * 0.45, max(d * 0.45 + 0.01, d - 0.3 - bd))
+                b = tuple(round(v, 2) for v in (bx, by, bx + bw, by + bd))
+                if all(
+                    b[2] + 0.6 < o[0] or o[2] + 0.6 < b[0] or b[3] + 0.6 < o[1] or o[3] + 0.6 < b[1]
+                    for o in boxes
+                ):
+                    boxes.append(b)
+                    break
+        out.append(Room(f"G{seed}-{i:02d}", w, d, x0, round(x0 + dw, 2), tuple(boxes)))
+    return out
+
+
 def standard_rooms() -> list[Room]:
     """E0 geometry set: 3 sizes x centre/corner-fed door, plus two rooms with furniture."""
     rooms = []

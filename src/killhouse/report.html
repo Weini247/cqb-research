@@ -33,8 +33,9 @@
 <div class="wrap">
   <h1>How close are CQB room-entry techniques to the best found strategy?</h1>
   <div class="muted">Killhouse, exploratory, not preregistered. Stylized doctrine models vs.
-    cross-entropy search in the same plan space. Risk R = probability that one hidden threat at a
-    uniformly random position hits the team before it is neutralized (duel model).</div>
+    cross-entropy search in the same plan space. Risk = probability that hidden threats at
+    random positions hit the team before they are neutralized (duel model; risk_multi: several
+    threats, one target per operator).</div>
   <div id="cfg" class="small muted"></div>
 
   <h2>Summary</h2>
@@ -63,7 +64,7 @@
 const D = /*__DATA__*/null;
 const COLORS = ["#4ea1ff", "#c678dd", "#56d364", "#ff9f43", "#f3a712"];
 const $ = id => document.getElementById(id);
-const c = D.config;
+const c = D.config, OBJ = c.objective || "risk";
 $("cfg").textContent = `FOV ${c.half_fov_deg * 2}° · dwell ${c.dwell}s · turn ${c.turn_rate} rad/s · dt ${c.dt}s · `
   + `horizon ${c.horizon}s · threat react ${c.threat_react}s / hit ${c.threat_rate}/s · engage ${c.engage_rate}/s · CEM ${c.iters}×${c.pop} × ${c.weights.length} weights · seed ${c.seed} · ${c.runtime_s}s runtime`;
 
@@ -72,7 +73,7 @@ let rows = "<thead><tr><th>room</th><th>technique</th><th>R</th><th>T [s]</th><t
   + "<th>R best found</th><th>gap R</th><th>gap T</th></tr></thead><tbody>";
 D.rooms.forEach((r, ri) => r.doctrines.forEach(d => {
   rows += `<tr data-r="${ri}"><td>${r.room.name}</td><td>${d.name}</td>` + (d.feasible
-    ? `<td>${d.risk.toFixed(3)}</td><td>${d.t_clear.toFixed(1)}</td><td>${d.fratricide.toFixed(1)}</td>`
+    ? `<td>${d[OBJ].toFixed(3)}</td><td>${d.t_clear.toFixed(1)}</td><td>${d.fratricide.toFixed(1)}</td>`
       + `<td>${d.risk_best.toFixed(3)}</td><td class="${d.gap_risk > 0.05 ? "gap-pos" : ""}">${pct(d.gap_risk)}</td>`
       + `<td>${pct(d.gap_time)}</td>`
     : `<td colspan="6" class="muted">invalid: ${d.uncleared_end > 0.005 ? (d.uncleared_end * 100).toFixed(1) + "% never seen" : "collision/wall"}</td>`)
@@ -90,9 +91,9 @@ D.rooms.forEach((r, i) => {
 function scatter(r) {
   const cv = $("scatter"), g = cv.getContext("2d"), W = cv.width, H = cv.height, m = 56;
   g.clearRect(0, 0, W, H);
-  const pts = r.cloud.concat(r.front).concat(r.doctrines.filter(d => d.feasible).map(d => [d.risk, d.t_clear]));
+  const pts = r.cloud.concat(r.front).concat(r.doctrines.filter(d => d.feasible).map(d => [d[OBJ], d.t_clear]));
   const best = r.replays.find(p => p.name.startsWith("best"));
-  if (best) pts.push([best.metrics.risk, best.metrics.t_clear]);
+  if (best) pts.push([best.metrics[OBJ], best.metrics.t_clear]);
   if (!pts.length) return;
   const xmax = Math.max(...pts.map(p => p[1])) * 1.08, ymax = Math.max(...pts.map(p => p[0])) * 1.1;
   const X = t => m + t / xmax * (W - m - 16), Y = e => H - m - e / ymax * (H - m - 16);
@@ -109,11 +110,11 @@ function scatter(r) {
   r.front.forEach((p, i) => i ? g.lineTo(X(p[1]), Y(p[0])) : g.moveTo(X(p[1]), Y(p[0]))); g.stroke();
   r.doctrines.forEach((d, i) => {
     if (!d.feasible) return;
-    g.fillStyle = COLORS[i]; g.beginPath(); g.arc(X(d.t_clear), Y(d.risk), 10, 0, 7); g.fill();
-    g.fillText(d.name, X(d.t_clear) + 14, Y(d.risk) - 10 - i * 4);
+    g.fillStyle = COLORS[i]; g.beginPath(); g.arc(X(d.t_clear), Y(d[OBJ]), 10, 0, 7); g.fill();
+    g.fillText(d.name, X(d.t_clear) + 14, Y(d[OBJ]) - 10 - i * 4);
   });
   if (best) {
-    const x = X(best.metrics.t_clear), y = Y(best.metrics.risk);
+    const x = X(best.metrics.t_clear), y = Y(best.metrics[OBJ]);
     g.fillStyle = COLORS[4]; g.font = "40px system-ui"; g.fillText("★", x - 15, y + 14);
   }
 }
@@ -129,7 +130,7 @@ function select(i) {
     const div = document.createElement("div"); div.className = "panel card";
     const m = rp.metrics;
     div.innerHTML = `<b style="color:${COLORS[Math.min(j, 4)]}">${rp.name}</b><canvas></canvas>`
-      + `<div class="small muted">R ${m.risk.toFixed(3)} · E ${m.exposure.toFixed(3)} · T ${m.t_clear.toFixed(1)}s · fr ${m.fratricide.toFixed(1)}s`
+      + `<div class="small muted">${OBJ} ${m[OBJ].toFixed(3)} · R1 ${m.risk.toFixed(3)} · E ${m.exposure.toFixed(3)} · T ${m.t_clear.toFixed(1)}s · fr ${m.fratricide.toFixed(1)}s`
       + `${m.feasible ? "" : " · invalid"}</div>`;
     $("panels").appendChild(div);
     return { rp, cv: div.querySelector("canvas") };
