@@ -31,6 +31,18 @@ python -m uv run killhouse-3d out/bench-e1/results.json  # -> out/bench-e1/viewe
 python -m uv run killhouse-bench --quick --rooms M-center  # smoke run
 ```
 
+## Apartments (multi-room)
+
+- `geom.py`: floorplans as blocking boxes (walls, open door leaves, furniture), precomputed
+  visibility, A* walking grid
+- `apartment.py`: apartment generator (hallway, 4-6 rooms, door swing, wardrobes, landing)
+- `clearing.py`: room-by-room clearing with the playbooks in each door's local frame, rear
+  security in the hallway, risk over the whole episode ([report](docs/REPORT_APARTMENT_v0.md))
+
+```
+python -m uv run killhouse-apartment --seeds 1 3 5 --out out/apartment   # + viewer3d.html
+```
+
 ## Building spike (spike 1)
 
 - `building.py`: procedural building (default 30×40 m, 0.5 m grid, BSP rooms, 2 m corridors,

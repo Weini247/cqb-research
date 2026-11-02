@@ -59,6 +59,7 @@ class OpPlan:
     pod2: tuple[float, float] | None = None  # optional second position (clear dead space)
     gaze3: float = 0.0  # gaze target while moving to / holding pod2
     hold2: float = 0.6  # s to hold the sector (gaze2) at the POD before leaving for pod2
+    start: tuple[float, float] | None = None  # override of the stack position (multi-room)
 
 
 @dataclass
@@ -110,6 +111,8 @@ def wrap(a):
 
 
 def stack_pos(room: Room, op: Operator, plan: OpPlan) -> np.ndarray:
+    if plan.start is not None:
+        return np.array(plan.start, float)
     off = 0.35 + plan.slot * STACK_GAP
     x = room.door_x0 - off if plan.side < 0 else room.door_x1 + off
     return np.array([x, -(room.wall_t + op.radius_m + 0.05)])
@@ -218,6 +221,30 @@ def multi_threat_risk(looked, detected, h, idx, engage_rate) -> float:
     return float(1 - u.mean())
 
 
+def perception_and_duel(vis, looked, cfg: ModelCfg, threat_idx):
+    """Detection (dwell), exposure and the duel risks from (T,n,m) visibility arrays."""
+    nt, _, m = vis.shape
+    seen = np.cumsum(looked.any(axis=1), axis=0) >= max(1, round(cfg.dwell / DT))
+    first = np.where(seen.any(0), seen.argmax(0), nt)
+    alive = np.arange(nt)[:, None] < first[None, :]  # not yet detected
+    exposure = float((vis & alive[:, None, :]).sum()) / m * DT
+    # Duel per threat position: a threat that has had an operator in view for threat_react
+    # hits the team at threat_rate until neutralized; neutralization needs detection and then
+    # runs at engage_rate per operator currently aiming at it (more guns on a sector help).
+    sees = vis.any(axis=1)
+    ready = np.cumsum(sees, axis=0) >= max(1, round(cfg.threat_react / DT))
+    h = np.where(ready & sees, 1 - math.exp(-cfg.threat_rate * DT), 0.0)
+    engaged = looked.sum(axis=1) * ~alive
+    q = 1 - np.exp(-cfg.engage_rate * DT * engaged)
+    surv = np.cumprod((1 - h) * (1 - q), axis=0)
+    before = np.vstack([np.ones((1, m)), surv[:-1]])  # threat active and team unhurt
+    risk = float((before * h).sum(0).mean())
+    hit_free = np.cumprod(1 - h, axis=0)[-1]
+    risk_multi = multi_threat_risk(looked, ~alive, h, threat_idx, cfg.engage_rate)
+    threat_alive = float((np.prod(1 - q, axis=0) * hit_free).mean())
+    return first, alive, exposure, risk, risk_multi, threat_alive
+
+
 def evaluate(
     room: Room,
     pb: Playbook,
@@ -233,25 +260,9 @@ def evaluate(
     ang = np.arctan2(q[None, :, 1] - p[:, 1, None], q[None, :, 0] - p[:, 0, None])
     fov = np.abs(wrap(ang.reshape(NT, n, m) - gaze[..., None])) <= cfg.half_fov
     looked = vis & fov
-    seen = np.cumsum(looked.any(axis=1), axis=0) >= max(1, round(cfg.dwell / DT))
-    first = np.where(seen.any(0), seen.argmax(0), NT)
-    alive = np.arange(NT)[:, None] < first[None, :]  # not yet detected
-    exposure = float((vis & alive[:, None, :]).sum()) / m * DT
-
-    # Duel per threat position: a threat that has had an operator in view for threat_react
-    # hits the team at threat_rate until neutralized; neutralization needs detection and then
-    # runs at engage_rate per operator currently aiming at it (more guns on a sector help).
-    sees = vis.any(axis=1)
-    ready = np.cumsum(sees, axis=0) >= max(1, round(cfg.threat_react / DT))
-    h = np.where(ready & sees, 1 - math.exp(-cfg.threat_rate * DT), 0.0)
-    engaged = looked.sum(axis=1) * ~alive
-    q = 1 - np.exp(-cfg.engage_rate * DT * engaged)
-    surv = np.cumprod((1 - h) * (1 - q), axis=0)
-    before = np.vstack([np.ones((1, m)), surv[:-1]])  # threat active and team unhurt
-    risk = float((before * h).sum(0).mean())
-    hit_free = np.cumprod(1 - h, axis=0)[-1]
-    risk_multi = multi_threat_risk(looked, ~alive, h, threat_sets(room, m, cfg), cfg.engage_rate)
-    threat_alive = float((np.prod(1 - q, axis=0) * hit_free).mean())
+    first, alive, exposure, risk, risk_multi, threat_alive = perception_and_duel(
+        vis, looked, cfg, threat_sets(room, m, cfg)
+    )
     unc = alive.mean(1)
     done = np.nonzero(unc <= CLEAR_FRAC)[0]
     t_clear = float(done[0] * DT) if done.size else HORIZON + 10 * float(unc[-1])

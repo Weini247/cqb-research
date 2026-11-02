@@ -12,7 +12,7 @@ import math
 import numpy as np
 
 from .entry import CLEAR_FRAC, NT, OpPlan, Playbook, evaluate, threshold_x
-from .room import Room, los
+from .room import Room, _seg_hits_box, los
 from .team import Operator
 
 SIDES = [(-1, 0), (1, 0), (-1, 1), (1, 1)]
@@ -104,22 +104,43 @@ def _free_cells(room: Room, r: float) -> np.ndarray:
     return c[keep]
 
 
-def with_dead_space_step(room: Room, team: list[Operator], pb: Playbook, k: int = 4) -> Playbook:
+def with_dead_space_step(
+    room: Room, team: list[Operator], pb: Playbook, k: int = 4, strict: bool = False
+) -> Playbook:
     """Doctrinal "clear dead space": if the plan leaves threat positions unseen, send one
     entered operator (preferably #3/#4) to the free spot that sees most of them, after it has
-    held its sector. Deterministic search over operator x top-k candidate spots."""
+    held its sector. Deterministic search over operator x top-k candidate spots. With
+    strict=True (multi-room use) any unseen position triggers the step, e.g. behind a door leaf."""
     base = evaluate(room, pb, team, keep=True)
-    if base.uncleared_end <= CLEAR_FRAC:
+    if base.uncleared_end <= (0.0 if strict else CLEAR_FRAC):
         return pb
     q = room.points()
     unseen = q[base.first_seen >= NT]
     entered = [i for i, o in enumerate(pb.ops) if o.enter]
     order = sorted(entered, key=lambda i: (pb.ops[i].slot == 0, i))  # #3/#4 first
     best, best_key = pb, (base.uncleared_end, base.risk_multi)
+    if not len(unseen):
+        return pb
     for i in order[:2]:
-        cells = _free_cells(room, team[i].radius_m)
+        r = team[i].radius_m
+        cells = _free_cells(room, r)
+        # only spots reachable from the POD in a straight line (the move is not path-planned)
+        pod = np.array(pb.ops[i].pod)
+        reach = np.ones(len(cells), bool)
+        for x0, y0, x1, y1 in room.obstacles:
+            reach &= ~_seg_hits_box(
+                np.full(len(cells), pod[0]),
+                np.full(len(cells), pod[1]),
+                cells[:, 0],
+                cells[:, 1],
+                (x0 - r, y0 - r, x1 + r, y1 + r),
+            )
+        cells = cells[reach]
+        if not len(cells):
+            continue
         counts = los(room, cells, unseen).sum(1)
-        for c in cells[np.argsort(-counts)[:k]]:
+        dist = np.linalg.norm(cells - pod, axis=1)
+        for c in cells[np.lexsort((dist, -counts))[:k]]:
             vis = los(room, c[None], unseen)[0]
             tgt = unseen[vis].mean(0) if vis.any() else unseen.mean(0)
             ops = list(pb.ops)
@@ -128,8 +149,11 @@ def with_dead_space_step(room: Room, team: list[Operator], pb: Playbook, k: int 
             )
             cand = Playbook(pb.name + "+dead-space", ops)
             res = evaluate(room, cand, team)
-            key = (max(res.uncleared_end, CLEAR_FRAC), res.risk_multi)
-            if res.collision < 0.02 and res.wall < 0.02 and key < best_key:
+            key = (max(res.uncleared_end, 0.0 if strict else CLEAR_FRAC), res.risk_multi)
+            # no worse physically than the base plan (a door leaf may already touch its path)
+            ok = res.collision < max(0.02, base.collision + 0.01)
+            ok &= res.wall < max(0.02, base.wall + 0.01)
+            if ok and key < best_key:
                 best, best_key = cand, key
     return best
 

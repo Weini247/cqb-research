@@ -28,16 +28,14 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
 - ✅ Pilotlauf mit dem Ziel `risk_multi`: [REPORT_E1_pilot.md](REPORT_E1_pilot.md)
 - **Fertig, wenn:** Bericht E1-Pilot steht, Prüfpaket kann verschickt werden.
 
-### 2 · Mehrere Räume: die Wohnung ⏳
-- Allgemeine Geometrie: Wände als Segmente, Sicht über ganze Grundrisse, Bedrohungen in allen
-  Räumen, Gefahr aus ungesicherten Nachbarräumen und Fluren
-- Türen mit Anschlag (innen/außen, Scharnierseite), mehrere Eingänge
-- Wohnungsgenerator (80–120 m², 4–7 Räume, Flur, Möbel); echte Grundrisse aus öffentlichen
-  Datensätzen, nachdem deren Lizenz geprüft ist
-- Gebäude-Ablauf: Reihenfolge, Flursicherung, Raumeintritte mit den Katalog-Techniken
-- 3D-Viewer für Wohnungen (abgeschnittene Wände, Folgekamera, Geist)
-- **Fertig, wenn:** Ein Befehl erzeugt eine Wohnung plus Episode mit Risiko-Kennzahlen, im
-  3D-Viewer anschaubar, mit Tests.
+### 2 · Mehrere Räume: die Wohnung ✅ (v0)
+- ✅ Allgemeine Geometrie (Boxen, Sicht-Vorberechnung), Gefahr aus ungesicherten Nachbarräumen
+- ✅ Türen mit Anschlag (offen, 90°, Scharnierseite zufällig), Totraum hinter der Tür
+- ✅ Wohnungsgenerator mit Flur, 4–6 Räumen, Küche über Wohnzimmer, Schränken, Treppenhaus
+- ✅ Gebäude-Ablauf: Flur-Technik, Raumreihenfolge, Flursicherung durch #3/#4, Doktrinen pro Raum
+- ✅ 3D-Viewer für Wohnungen (Raumbeschriftungen, Folgekamera, Geist)
+- ⏳ echte Grundrisse aus Datensätzen (Lizenz prüfen), Optimierung auf Gebäudeebene, geschlossene Türen
+- Bericht: [REPORT_APARTMENT_v0.md](REPORT_APARTMENT_v0.md)
 
 ### 3 · Echte Taktiken: der Katalog ⏳
 - `docs/TACTICS.md`: jede Technik mit Quelle, Parametern, Anwendbarkeit und Review-Status

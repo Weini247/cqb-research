@@ -35,7 +35,7 @@
 <canvas id="c"></canvas>
 <div id="err">3D-Ansicht braucht WebGL und Internet (three.js vom CDN).</div>
 <div class="hud" id="top">
-  <b class="big">Killhouse · Raumeintritt</b>
+  <b class="big">Killhouse · Raumeintritt &amp; Wohnung</b>
   <div class="row">
     <select id="room" aria-label="Raum"></select>
     <select id="tech" aria-label="Technik"></select>
@@ -47,7 +47,7 @@
 </div>
 <div class="hud" id="bar">
   <button id="play">⏸</button>
-  <select id="speed" aria-label="Tempo"><option value="0.25">0,25×</option><option value="0.5" selected>0,5×</option><option value="1">1×</option></select>
+  <select id="speed" aria-label="Tempo"><option value="0.25">0,25×</option><option value="0.5" selected>0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
   <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Zeit">
   <span id="time" class="muted" style="min-width:64px"></span>
   <span class="muted">Wände</span><input id="wallh" type="range" min="0.3" max="2.6" step="0.1" value="1.2" aria-label="Wandhöhe" style="width:90px">
@@ -243,9 +243,22 @@ let team = [], ghostTeam = [], dots = null, room = null, rep = null, ghostRep = 
 let t = 0, playing = true, camMode = "oblique", showFov = true;
 const RED = new THREE.Color(0xe5484d), GREEN = new THREE.Color(0x5f9c78);
 
+// scene extent in room coordinates: single room (w x d) or apartment bounds
+function extent(R) {
+  if (R.bounds) { const [x0, y0, x1, y1] = R.bounds; return { x0, y0, x1, y1 }; }
+  return { x0: 0, y0: 0, x1: R.w, y1: R.d };
+}
+
 function buildWalls() {
   world.remove(wallGroup); wallGroup = new THREE.Group(); world.add(wallGroup);
-  const R = room.room, H = +$("wallh").value, w = R.w, d = R.d, [dx0, dx1] = R.door;
+  const R = room.room, H = +$("wallh").value;
+  if (R.boxes) {
+    const height = { wall: H, door: Math.min(2.0, H), crate: Math.min(1.8, H) };
+    R.boxes.forEach(([x0, y0, x1, y1, kind]) =>
+      wallGroup.add(box(x0, y0, x1, y1, 0, height[kind], kind === "door" ? "wall" : kind)));
+    return;
+  }
+  const w = R.w, d = R.d, [dx0, dx1] = R.door;
   const T = 0.2, ext = 2.6, back = -2.8;
   const add = (...a) => wallGroup.add(box(...a));
   add(-T, 0, 0, d + T, 0, H, "wall");
@@ -260,8 +273,8 @@ function buildWalls() {
 function loadRoom(i) {
   scene.remove(world); world = new THREE.Group(); scene.add(world);
   room = D.rooms[i];
-  const R = room.room, w = R.w, d = R.d;
-  const fx0 = -6, fx1 = w + 6, fy0 = -7, fy1 = d + 4;
+  const R = room.room, E = extent(R), w = E.x1 - E.x0, d = E.y1 - E.y0;
+  const fx0 = E.x0 - 6, fx1 = E.x1 + 6, fy0 = Math.min(E.y0, 0) - 7, fy1 = E.y1 + 4;
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(fx1 - fx0, fy1 - fy0).rotateX(-Math.PI / 2),
     gridMat("floor", fx1 - fx0, fy1 - fy0));
   floor.position.set((fx0 + fx1) / 2, 0, -(fy0 + fy1) / 2); floor.receiveShadow = true; world.add(floor);
@@ -269,14 +282,16 @@ function loadRoom(i) {
     new THREE.MeshStandardMaterial({ color: 0xbfc5cc, roughness: 1 }));
   ground.position.y = -0.01; ground.receiveShadow = true; world.add(ground);
   buildWalls();
-  R.obstacles.forEach(([x0, y0, x1, y1]) => world.add(box(x0, y0, x1, y1, 0, 1.15, "crate")));
+  (R.obstacles || []).forEach(([x0, y0, x1, y1]) => world.add(box(x0, y0, x1, y1, 0, 1.15, "crate")));
+  (R.labels || []).forEach(lb => world.add(floorLabel(lb.name, lb.x, lb.y)));
   // door marker arrow on the hallway floor, like a training-facility floor marking
   const arrow = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([
     new THREE.Vector2(0, 0.35), new THREE.Vector2(0.3, 0), new THREE.Vector2(0.1, 0),
     new THREE.Vector2(0.1, -0.35), new THREE.Vector2(-0.1, -0.35), new THREE.Vector2(-0.1, 0),
     new THREE.Vector2(-0.3, 0)])).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0xf5f6f7 }));
-  arrow.position.set((R.door[0] + R.door[1]) / 2, 0.012, 1.7); world.add(arrow);
+  const ax = R.entrance ? R.entrance[0] : (R.door[0] + R.door[1]) / 2;
+  arrow.position.set(ax, 0.012, 1.7); world.add(arrow);
 
   const pts = room.points;
   dots = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.045, 0.045, 0.02, 8),
@@ -285,13 +300,29 @@ function loadRoom(i) {
   pts.forEach(([x, y], k) => { m4.makeTranslation(x, 0.015, -y); dots.setMatrixAt(k, m4); dots.setColorAt(k, RED); });
   world.add(dots);
 
-  sun.position.set(w / 2 - 7, 14, -d / 2 + 9); sun.target.position.set(w / 2, 0, -d / 2);
+  const cx = (E.x0 + E.x1) / 2, cy = (E.y0 + E.y1) / 2, sp = Math.max(w, d);
+  sun.position.set(cx - 7, 14 + sp * 0.4, -cy + 9); sun.target.position.set(cx, 0, -cy);
+  Object.assign(sun.shadow.camera, { left: -sp, right: sp, top: sp, bottom: -sp });
+  sun.shadow.camera.updateProjectionMatrix();
+  if (R.boxes) $("speed").value = "1";
   $("tech").innerHTML = room.replays.map((r, k) => `<option value="${k}">${r.name}</option>`).join("");
   $("ghost").innerHTML = `<option value="-1">kein Vergleich</option>`
     + room.replays.map((r, k) => `<option value="${k}">Geist: ${r.name}</option>`).join("");
   const kn = room.replays.findIndex(r => r.name.startsWith("best"));
   $("ghost").value = kn >= 0 ? kn : -1;
   loadTech(0); setCam(camMode, true);
+}
+
+function floorLabel(text, x, y) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 96;
+  const g = c.getContext("2d"); g.font = "600 52px system-ui, sans-serif";
+  g.fillStyle = "rgba(255,255,255,0.85)"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 256, 48);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.45).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  m.position.set(x, 0.02, -y); m.renderOrder = 1;
+  return m;
 }
 
 function spawn(list, ghost) {
@@ -310,8 +341,10 @@ function loadTech(k) {
   ghostTeam.forEach(m => { m.g.visible = !!ghostRep; });
   const m = rep.metrics;
   const OBJ = D.config.objective || "risk";
-  $("metrics").innerHTML = `Risiko <b>${m[OBJ].toFixed(3)}</b> · gesichert nach <b>${m.t_clear.toFixed(1)} s</b>`
-    + ` · Fratricide ${m.fratricide.toFixed(1)} s${m.feasible ? "" : " · <span style='color:#ff8a80'>ungültig</span>"}`
+  const tc = m.t_clear == null ? "–" : m.t_clear.toFixed(1) + " s";
+  $("metrics").innerHTML = `Risiko <b>${m[OBJ].toFixed(3)}</b> · gesichert nach <b>${tc}</b>`
+    + (m.fratricide != null ? ` · Fratricide ${m.fratricide.toFixed(1)} s` : ` · Dauer ${m.duration} s`)
+    + `${m.feasible ? "" : " · <span style='color:#ff8a80'>nicht vollständig gesichert</span>"}`
     + (ghostRep ? ` · Geist: ${ghostRep.name} (R ${ghostRep.metrics[OBJ].toFixed(3)})` : "");
   t = 0;
 }
@@ -340,8 +373,8 @@ function pose(list, r, time, dt) {
 function setCam(mode, snap) {
   camMode = mode;
   ["oblique", "top", "follow"].forEach(c => $("cam-" + c).classList.toggle("on", c === mode));
-  const R = room.room, cx = R.w / 2, cz = -R.d / 2 + 0.8;
-  const span = (Math.max(R.w, R.d) + 3) / Math.min(1, camera.aspect * 1.25);
+  const R = room.room, E = extent(R), cx = (E.x0 + E.x1) / 2, cz = -(Math.max(E.y0, 0) + E.y1) / 2 + 0.8;
+  const span = (Math.max(E.x1 - E.x0, E.y1 - E.y0) + 3) / Math.min(1, camera.aspect * 1.25);
   if (mode === "top") { camera.position.set(cx, span * 1.55, cz + 0.01); controls.target.set(cx, 0, cz); }
   else if (mode === "oblique" || snap) {
     camera.position.set(cx - span * 0.35, span * 0.95, cz + span * 1.05); controls.target.set(cx, 0, cz - 0.4);
@@ -393,8 +426,9 @@ $("fig").onclick = () => {
   const keep = t; loadTech(+$("tech").value); t = keep;
 };
 
+window.killhouse = { scene, camera, controls };  // for debugging in the console
 resize();
-const start = Math.max(0, D.rooms.findIndex(r => r.room.name === "L-corner"));
+const start = Math.max(0, D.rooms.findIndex(r => r.room.name === "L-corner" || r.room.boxes));
 $("room").value = start; loadRoom(start);
 requestAnimationFrame(frame);
 </script>
