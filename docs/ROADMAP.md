@@ -19,6 +19,37 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
 - **Jede Entdeckung muss vier Prüfungen bestehen:** neue Grundrisse, Sensitivität,
   adaptiver Gegner, Ausbilder.
 
+## Northstar (Maßstab, bewusst ambitioniert)
+
+**An open reference platform for coordinated search under limited visibility.** It makes
+spatial planning comparable, explains why methods fail, and tests whether results transfer
+to new environments and other model assumptions.
+
+**Guiding question:** Which properties make coordinated search methods under limited
+visibility reliable, and how can that reliability be shown independently of individual
+environments and modelling choices?
+
+**First concrete sub-question (study 1):** How strongly do rankings of search methods
+depend on the optimization budget, information access and evaluation protocol?
+
+**Yardsticks (deliberately ambitious):** an external person reproduces the main results from
+a release · new planners plug in through a documented interface · the benchmark exposes
+systematic failures of strong methods · a statement holds on unseen floorplans and under
+changed assumptions · *far goal:* another research group uses the platform.
+
+CQB remains the defining case study. Transfer to rescue robotics, inspection or human teams
+would be separate research with its own tasks and evidence.
+
+## Neue Reihenfolge (Plattform-Pfad)
+
+1. M2a Referenzfälle mit bekannter Lösung · M2b Seed-Streuung und Sättigung
+2. Schnittstelle für Planungsverfahren und Aufgabenspezifikation; klassische Vergleichsverfahren
+   (zufällige Suche, gierige Sichtabdeckung, Watchman-Route)
+3. Fehlerdiagnose pro Durchlauf (ungesehener Bereich, Kollision, späte Identifikation, ...)
+4. Studie 1, präregistriert: Zuverlässigkeit von Rangfolgen auf zurückgehaltenen Räumen
+5. Release v0.2 und Preprint
+6. Weitere Verfahren auf der Plattform: Sprachmodell-Planer, Roboter-Szenarien, Taktiksuche
+
 ## Nächste Meilensteine (nach Review R3)
 
 | Meilenstein | Inhalt | Abnahme |

@@ -1,5 +1,26 @@
 # Big picture (as of 2026-11-02)
 
+## North star (aspirational yardstick)
+
+**An open reference platform for coordinated search under limited visibility.** It makes
+spatial planning comparable, explains why methods fail, and tests whether results transfer
+to new environments and other model assumptions.
+
+**Guiding question:** Which properties make coordinated search methods under limited
+visibility reliable, and how can that reliability be shown independently of individual
+environments and modelling choices?
+
+**First concrete sub-question (study 1):** How strongly do rankings of search methods
+depend on the optimization budget, information access and evaluation protocol?
+
+**Yardsticks (deliberately ambitious):** an external person reproduces the main results from
+a release · new planners plug in through a documented interface · the benchmark exposes
+systematic failures of strong methods · a statement holds on unseen floorplans and under
+changed assumptions · *far goal:* another research group uses the platform.
+
+CQB remains the defining case study. Transfer to rescue robotics, inspection or human teams
+would be separate research with its own tasks and evidence.
+
 ## Goal
 
 **Main question (since review R3):** How strongly do comparisons of coordinated multi-agent search strategies depend on model assumptions, information access and the evaluation protocol?

@@ -12,6 +12,10 @@ not a validated tactical model. See [Scope and ethics](ETHICS.md).
 |---|---|
 | ![apartment](docs/media/apartment.gif) | ![room entry](docs/media/room-entry.gif) |
 
+**North star:** an open reference platform for coordinated search under limited visibility.
+It should make spatial planning comparable, explain why methods fail, and test whether results
+transfer to new environments and assumptions ([BIG_PICTURE](docs/BIG_PICTURE.md)).
+
 ## What is in here
 
 - **Geometry:** rooms with door channels and wall thickness; generated apartments with a
