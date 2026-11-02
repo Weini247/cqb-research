@@ -65,11 +65,13 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
 - ⏳ Fehlidentifikation, Unbeteiligte als eigene Klasse, bewegliche Gegner, Außenfenster, Treppen
 - Vereinfachung: Solange eine Tür zu ist, wirft ihr (geöffnetes) Blatt trotzdem Schatten in der Sicht-Vorberechnung
 
-### 5 · Robustheit und Gegner ⏳
-- Robustheitsstudie: Sind optimierte Strategien fragil, Doktrinen robust?
-- Gegner, der die Taktik kennt (bestmögliche Positionierung): Was kostet Vorhersagbarkeit,
-  lohnt sich Mischen?
-- **Fertig, wenn:** Beide Fragen sind mit Grafiken und Konfidenzintervallen beantwortet.
+### 5 · Robustheit und Gegner ✅ (explorativ)
+- ✅ Gegner, der die Taktik kennt, und der Preis der Vorhersagbarkeit (`adversary.py`): Mischen senkt
+  das Worst-Case-Risiko bei mittigen Türen um 26–29 %, bei Ecktüren um 4–5 %
+- ✅ Robustheitsstudie (`robustness.py`): Das Risiko ist robust, die Ausführung nicht; Crisscross und
+  Pie fallen bei 1× Rauschen auf 21–38 % gültige Durchgänge, die Kombination bleibt bei 62–96 %
+- ⏳ Spiel mit mehreren Bedrohungen, korrelierte Ausführungsfehler
+- Bericht: [REPORT_E5.md](REPORT_E5.md)
 
 ### 6 · Bestätigungsstudie und Preprint 1 ⏳
 - Präregistrierung einfrieren (nach dem Review), git-Tag, OSF
