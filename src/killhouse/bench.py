@@ -55,19 +55,26 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
     for d in doc_out:
         if d["feasible"]:
             d.update(archive.gap(d["exposure"], d["t_clear"], d["fratricide"]))
+    # "best found" replay: knee of the front at fratricide <= the safest valid doctrine
     valid = [d for d in doc_out if d["feasible"]]
-    if valid:
-        ref = min(valid, key=lambda d: (d["exposure"], d["t_clear"]))
-        cand = [
-            i
-            for i, (e, t, fr) in enumerate(archive.rows)
-            if t <= ref["t_clear"] + 1e-9 and fr <= ref["fratricide"] + 1e-9
-        ]
-        i = min(cand, key=lambda i: archive.rows[i][0])
+    fr_cap = min((d["fratricide"] for d in valid), default=float("inf"))
+    knee_front = archive.front(fr_cap) or archive.front()
+    if knee_front:
+        e0 = min(archive.rows[i][0] for i in knee_front)
+        t0 = min(archive.rows[i][1] for i in knee_front)
+        i = min(knee_front, key=lambda i: archive.rows[i][0] / e0 + archive.rows[i][1] / t0)
         pb = decode(archive.xs[i], room, team)
         res = evaluate(room, pb, team, keep=True)
-        replays.append(_replay(room, f"best found (vs {ref['name']})", pb, res))
-    front = [list(archive.rows[i]) for i in archive.front()]
+        replays.append(_replay(room, "best found (knee)", pb, res))
+    front_idx = archive.front()
+    front = [list(archive.rows[i]) for i in front_idx]
+    front_plans = [
+        {
+            "metrics": [round(v, 4) for v in archive.rows[i]],
+            "x": np.round(archive.xs[i], 4).tolist(),
+        }
+        for i in front_idx
+    ]
     rng = np.random.default_rng(0)
     pick = rng.choice(len(archive.rows), size=min(400, len(archive.rows)), replace=False)
     cloud = [[round(v, 3) for v in archive.rows[i]] for i in pick]
@@ -76,6 +83,7 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
         "points": room.points().round(3).tolist(),
         "doctrines": doc_out,
         "front": [[round(v, 4) for v in r] for r in front],
+        "front_plans": front_plans,
         "cloud": cloud,
         "n_valid": len(archive.rows),
         "replays": replays,
