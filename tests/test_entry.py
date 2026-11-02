@@ -89,3 +89,12 @@ def test_threat_model_rewards_more_guns_and_faster_engagement():
     fast = evaluate(ROOM, pb, TEAM, cfg=ModelCfg(engage_rate=8.0))
     slow = evaluate(ROOM, pb, TEAM, cfg=ModelCfg(engage_rate=2.0))
     assert fast.risk < four.risk < slow.risk
+
+
+def test_kendall_and_variants():
+    from killhouse.sensitivity import _variant, kendall
+
+    assert kendall({"a": 1, "b": 2, "c": 3}, {"a": 1, "b": 2, "c": 3}) == 1.0
+    assert kendall({"a": 1, "b": 2}, {"a": 2, "b": 1}) == -1.0
+    _, rooms, _ = _variant("door_w", 1.2)
+    assert all(abs((r.door_x1 - r.door_x0) - 1.2) < 1e-9 for r in rooms)

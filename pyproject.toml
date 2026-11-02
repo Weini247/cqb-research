@@ -10,6 +10,7 @@ dependencies = [
 [project.scripts]
 killhouse = "killhouse.cli:main"
 killhouse-bench = "killhouse.bench:main"
+killhouse-sens = "killhouse.sensitivity:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
