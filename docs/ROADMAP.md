@@ -47,12 +47,19 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
 - ⏳ Ausbilder-Review, Runde 1 (Aufgabe für dich; Fragen 12–17 im Prüfpaket ergänzt)
 - ⏳ L-Ecke und T-Kreuzung (braucht einen Generator für Flurkreuzungen), geschlossene Türen
 
-### 4 · Schneller Simulator (Idee 6) ⏳
-- PyTorch auf der GPU (CUDA 12.6 auf der 1070 Ti; JAX läuft unter Windows nicht nativ):
-  ganze Populationen auf einmal, weiche Sicht- und Blickfunktionen für Gradienten
-- Regressionstest gegen das numpy-Referenzmodell (gleiche Ergebnisse im harten Grenzfall)
-- **Fertig, wenn:** mindestens 20-mal schneller als die numpy-Referenz, mit messbarer
-  Gradientenoptimierung.
+### 4 · Schneller Simulator (Idee 6) ✅ (ohne Gradienten)
+- ✅ `fastsim.py`: Populations-Auswertung mit PyTorch/CUDA (optional: `uv sync --extra gpu`),
+  Wege, Blick, Sicht, Duell, Mehrfach-Bedrohung und Kollisionen als Batch
+- ✅ Regressionstest gegen die numpy-Referenz (4 Räume, beide Szenario-Sätze)
+- ✅ 14–19× pro Plan bei 64 Plänen; im Optimierer ~9 s statt ~4 min pro Raum und Gewicht bei
+  doppelter Population, 4–6× mehr gültige Auswertungen (behebt die Budgetlücke aus dem Pilot)
+- ⏳ weiche, differenzierbare Sicht- und Blickfunktionen für Gradientenoptimierung
+- ⏳ Wohnungs-Episoden auf der GPU
+
+### 2b · Umstände: Türen, Fenster, Personen ⏳
+- geschlossene Türen (Öffnen kostet Zeit, Anschlag erkennen), Fenster als Sichtlinien
+- neutrale Personen: Entdecken, Identifizieren, Fehlidentifizieren als getrennte Ereignisse
+- Bedrohungen und Personen im Viewer sichtbar (neutral markiert); später bewegliche Gegner, Treppen
 
 ### 5 · Robustheit und Gegner ⏳
 - Robustheitsstudie: Sind optimierte Strategien fragil, Doktrinen robust?

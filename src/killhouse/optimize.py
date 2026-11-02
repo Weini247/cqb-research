@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import math
+import os
 
 import numpy as np
 
+from . import fastsim
 from .doctrine import SIDES
 from .entry import OpPlan, Playbook, Result, evaluate
 from .room import Room
@@ -18,6 +20,20 @@ HI = np.array([6.0, 1, 1, 1, math.pi, math.pi, 1, 1, 2, 1, 1, 1, math.pi])
 PER_OP = len(LO)
 ANGLES = [4, 5, 12]
 OBJECTIVE = "risk_multi"
+
+
+def backend() -> str:
+    """'torch' (GPU batch, default if installed) or 'numpy' (reference); env KILLHOUSE_BACKEND."""
+    want = os.environ.get("KILLHOUSE_BACKEND", "auto")
+    if want == "numpy" or not fastsim.available():
+        return "numpy"
+    return "torch"
+
+
+def evaluate_many(room: Room, pbs: list[Playbook], team: list[Operator]) -> list[Result]:
+    if backend() == "torch":
+        return fastsim.evaluate_batch(room, pbs, team)
+    return [evaluate(room, pb, team) for pb in pbs]
 
 
 def bounds(n: int) -> tuple[np.ndarray, np.ndarray]:
@@ -130,8 +146,9 @@ def cem(
                 xs[:, c] = (xs[:, c] + math.pi) % (2 * math.pi) - math.pi
         xs = np.clip(xs, lo, hi)
         gen = []
-        for x in xs:
-            res = evaluate(room, decode(x, room, team), team)
+        for x, res in zip(
+            xs, evaluate_many(room, [decode(x, room, team) for x in xs], team), strict=True
+        ):
             archive.add(res, x)
             gen.append((score(res, w), x))
         gen.sort(key=lambda s: s[0])

@@ -249,28 +249,11 @@ def perception_and_duel(vis, looked, cfg: ModelCfg, threat_idx):
     return first, alive, exposure, risk, risk_multi, threat_alive
 
 
-def evaluate(
-    room: Room,
-    pb: Playbook,
-    team: list[Operator],
-    keep: bool = False,
-    cfg: ModelCfg = DEFAULT_CFG,
-) -> Result:
-    pos, gaze, phase = trajectories(room, team, pb, cfg)
-    q = room.points()
-    m, n = len(q), len(team)
-    p = pos.reshape(-1, 2)
-    vis = los(room, p, q).reshape(NT, n, m)
-    ang = np.arctan2(q[None, :, 1] - p[:, 1, None], q[None, :, 0] - p[:, 0, None])
-    fov = np.abs(wrap(ang.reshape(NT, n, m) - gaze[..., None])) <= cfg.half_fov
-    looked = vis & fov
-    first, alive, exposure, risk, risk_multi, threat_alive = perception_and_duel(
-        vis, looked, cfg, threat_sets(room, m, cfg)
-    )
-    unc = alive.mean(1)
-    done = np.nonzero(unc <= CLEAR_FRAC)[0]
-    t_clear = float(done[0] * DT) if done.size else HORIZON + 10 * float(unc[-1])
-
+def physical_metrics(
+    room: Room, team: list[Operator], pos, gaze, phase
+) -> tuple[float, float, float]:
+    """Integrated body overlap, wall intrusion and muzzle-on-teammate time (all in units x s)."""
+    n = len(team)
     r = np.array([o.radius_m for o in team])
     x, y = pos[..., 0], pos[..., 1]
     t = room.wall_t
@@ -296,6 +279,32 @@ def evaluate(
             aim = np.abs(wrap(np.arctan2(d[:, 1], d[:, 0]) - gaze[:, i])) < MUZZLE
             mask = aim & (phase[:, i] >= 1) & _door_los(room, pos[:, i], pos[:, j])
             fratricide += float(mask.sum())
+    return collision * DT, float(wall.sum()) * DT, fratricide * DT
+
+
+def evaluate(
+    room: Room,
+    pb: Playbook,
+    team: list[Operator],
+    keep: bool = False,
+    cfg: ModelCfg = DEFAULT_CFG,
+) -> Result:
+    pos, gaze, phase = trajectories(room, team, pb, cfg)
+    q = room.points()
+    m, n = len(q), len(team)
+    p = pos.reshape(-1, 2)
+    vis = los(room, p, q).reshape(NT, n, m)
+    ang = np.arctan2(q[None, :, 1] - p[:, 1, None], q[None, :, 0] - p[:, 0, None])
+    fov = np.abs(wrap(ang.reshape(NT, n, m) - gaze[..., None])) <= cfg.half_fov
+    looked = vis & fov
+    first, alive, exposure, risk, risk_multi, threat_alive = perception_and_duel(
+        vis, looked, cfg, threat_sets(room, m, cfg)
+    )
+    unc = alive.mean(1)
+    done = np.nonzero(unc <= CLEAR_FRAC)[0]
+    t_clear = float(done[0] * DT) if done.size else HORIZON + 10 * float(unc[-1])
+
+    collision, wall, fratricide = physical_metrics(room, team, pos, gaze, phase)
     res = Result(
         risk,
         risk_multi,
@@ -303,9 +312,9 @@ def evaluate(
         exposure,
         t_clear,
         float(unc[-1]),
-        collision * DT,
-        float(wall.sum()) * DT,
-        fratricide * DT,
+        collision,
+        wall,
+        fratricide,
     )
     if keep:
         res.pos, res.gaze, res.first_seen = pos, gaze, first
