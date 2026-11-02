@@ -15,7 +15,8 @@ evaluated; only their hash was computed.
 | d9361b0 | GPU batch evaluation (same model) | speed only | — |
 | d5ce0ab | apartments: closed doors, identification (`id_time` 0.4) | first door-state comparison | — |
 | fe35d94 | adversary, robustness | stage-5 findings | — |
-| (this commit) | review R2: source status, valid-only stats, prereg tests | — | — |
+| (R2 commit) | review R2: source status, valid-only stats, prereg tests | — | — |
+| ee64dc1 / b1ca549 | M2: reference cases, CEM with random immigrants | saturation study on M-center, M-corner, L-center (5 seeds x 4 budgets) | prereg budget 60x64x4, pooled archives, saturation across seeds |
 
 **Rule from now on:** every report names its commit and its configuration (`config` in
 `results.json`). Changes to the model after the prereg freeze go only into a new, separately

@@ -49,16 +49,22 @@ the size of the gap?
 
 ## 4. Procedure
 
-For each confirmatory room: evaluate the four playbooks; run CEM (budget to be fixed after the
-fast simulator, at least 30 iterations x 32 samples x 4 weights, seeded with the playbooks;
-precondition: search saturation, i.e. the front changes < 2 % over the last 25 % of iterations) with optimizer seeds 0-4; build the archive per
-seed. **Scope of E1: single rooms only** (apartments are a separate later study). Gap per technique and room = relative reduction of `risk_multi` at equal-or-better
-`t_clear` and fratricide (`gap_risk`), computed on held-out threat scenarios for **one candidate per technique that was selected on
-planning scenarios** (lowest planning risk at equal-or-better time and fratricide). The
-optimistic best-of-front value is reported only as secondary. **Aggregation:** per room and
-technique, the median over the 5 optimizer seeds; tests then use rooms as the unit (no
-further averaging). Because two seeds differed by up to 20 points in the development rooms,
-the confirmatory run uses **5 seeds** and reports the spread across seeds as well.
+For each confirmatory room: evaluate the four playbooks; run CEM (`optimize.cem_minimize`,
+20 % random immigrants) with **60 iterations x 64 samples x 4 weights**, seeded with the
+playbooks, for optimizer seeds 0-4 (budget from the saturation study, REPORT_M2.md). **Pool the
+archives of all 5 seeds** per room (multi-start search). **Scope of E1: single rooms only**
+(apartments are a separate later study). Gap per technique and room = relative reduction of
+`risk_multi` at equal-or-better `t_clear` and fratricide (`gap_risk`), computed on held-out
+threat scenarios for **one candidate per technique that was selected on planning scenarios
+from the pooled archive** (lowest planning risk at equal-or-better time and fratricide). The
+optimistic best-of-front value is reported only as secondary. Tests use rooms as the unit.
+
+**Saturation (judged across seeds, not within a run):** a room counts as saturated when at
+least 3 of 5 seeds reach the pooled best planning risk within 2 %. Unsaturated rooms are kept
+and reported, with their gaps marked as lower bounds. Per room and technique, the per-seed gap
+spread and the number of seeds that leave the seeded playbook are reported as reliability
+measures. (REPORT_M2 showed that a run stuck at its starting playbook passes a within-run
+criterion, and that the median over seeds hides bimodal outcomes.)
 
 ## 5. Hypotheses and decision rules
 
@@ -71,7 +77,7 @@ the confirmatory run uses **5 seeds** and reports the spread across seeds as wel
 
 **Multiple testing:** H1, H2 and H4 form one family and are Holm-corrected at alpha = 0.05.
 H3 is a descriptive robustness criterion without a p-value. Rooms are the independent unit
-in every test, and seeds are aggregated within a room first (median, see §4).
+in every test, and seeds are combined within a room first (pooled archive, see §4).
 
 All four hypotheses are reported regardless of outcome. Exploratory analyses (for example,
 descriptions of the best found strategies) are labelled as such.
@@ -92,6 +98,10 @@ adversary movement, no doors that open, constant speeds, idealized perception, s
 scope, stylized playbooks.
 
 ## Change log
+
+- 2026-11-02: method check M2 (REPORT_M2.md): CEM with random immigrants; budget fixed at
+  60x64x4; seeds combined by pooling archives instead of the median; saturation judged across
+  seeds. The pooled-archive estimator still has to be implemented before the freeze.
 
 - 2026-11-02: first draft after the E1 pilot (multi-threat objective, dead-space step,
   room generator).

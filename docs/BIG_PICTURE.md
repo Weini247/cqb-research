@@ -69,7 +69,10 @@ preprint(s), later possibly a thesis.
    per doctrine and scored on held-out scenarios, gaps are 1-54 % at the full budget, but two
    optimizer seeds differ by up to 20 points (M-center crisscross 20 % vs. 0 %). The earlier
    "0 % for centre-fed doors" came from too small a budget. Gaps are lower bounds on attainable
-   improvement in the model, not stable effect sizes.
+   improvement in the model, not stable effect sizes. The method check M2 (REPORT_M2) refines
+   this: for the corner-fed door the gaps are saturated and seed-stable (spread 1-4 points);
+   for centre-fed doors the seeds split into "stays at the technique" (0 %) and "finds a
+   15-30 % better strategy", even at the largest budget.
 3. **Apartments may reverse the ranking (low reliability):** limited penetration with the
    dead-space step had the lowest risk in 3 development apartments. In APT1 it did not fully
    clear one room, the comparison population is small, and the hallway explanation is not
@@ -90,7 +93,8 @@ preprint(s), later possibly a thesis.
 - Nearly all parameters are free (see PARAMETERS.md).
 - Binary perception cone, crude dwell model.
 - No misidentification of uninvolved persons yet, no moving threats.
-- Results based on 8 development rooms and 1-2 seeds.
+- Results based on 8 development rooms and 1-2 seeds (5 seeds only in the M2 saturation study,
+  3 rooms).
 - Source page numbers only partly checked. Reviews R1/R2 were AI-assisted, not by instructors.
 - Model changes were made after seeing results (RUNLOG.md), so everything is exploratory so far.
 
