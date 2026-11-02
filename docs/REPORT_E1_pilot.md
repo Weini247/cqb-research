@@ -1,5 +1,9 @@
 # E1 pilot: several threats, dead space, 52-dim plan space
 
+> **Correction (review R1):** these gaps were computed on the same threat scenarios the
+> plans were tuned on. On held-out scenarios the centre-fed gaps shrink to 0 % (M-center,
+> L-center); corner-fed and small-room gaps are stable. See [REVIEW_R1.md](REVIEW_R1.md).
+
 Status: exploratory pilot on the 8 development rooms, one optimizer seed (0), reduced budget
 (CEM 20 x 32 x 4 weights). Primary outcome `risk_multi`: two hidden threats, 32 fixed
 placements per room, one target per operator. Reproduce:

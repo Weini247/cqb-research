@@ -43,6 +43,7 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
   Zwei-Mann, Limited Penetration, Pie + Crisscross, deliberat; Teams mit 2–4 Personen
 - ✅ Ausführungsfehler (Timing, Position, Blick, Tempo) und Robustheitsbewertung
 - ✅ Flur-Disziplin (offene Türen beim Passieren überwachen), Katalog in Wohnungen nutzbar
+- ✅ Methoden-Review R1 eingearbeitet ([REVIEW_R1.md](REVIEW_R1.md)): Szenario-Trennung, Kennzeichnung, Parameter-Herkunft
 - ⏳ Ausbilder-Review, Runde 1 (Aufgabe für dich; Fragen 12–17 im Prüfpaket ergänzt)
 - ⏳ L-Ecke und T-Kreuzung (braucht einen Generator für Flurkreuzungen), geschlossene Türen
 

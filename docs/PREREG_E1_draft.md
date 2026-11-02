@@ -4,6 +4,21 @@ Status: **draft**. It will be frozen (git tag + upload to a registry such as OSF
 SME review ([SME_REVIEW.md](SME_REVIEW.md)) has been incorporated. Until then, everything below
 may change. Changes are logged in the change log at the end.
 
+## 0. Scope and validity limits
+
+This study examines coordinated multi-agent search under geometric constraints and partial
+observability. The movement models are algorithmic abstractions; their correspondence to real
+tactical procedures is neither shown nor assumed, and technique names denote stylized models.
+Optimization results hold only within the defined simulation environment, constraints and
+objectives. No superiority of real police or military procedures is inferred from them.
+Transfer to human teams needs separate empirical calibration and independent expert
+validation. All changes to parameters, hypotheses and conditions are versioned before the
+registration is frozen.
+
+**Information model:** All strategies know the floorplan, no strategy knows threat positions
+(see [PARAMETERS.md](PARAMETERS.md)). Optimization uses planning scenarios; every confirmatory
+number is computed on held-out threat scenarios *and* held-out rooms.
+
 ## 1. Research question
 
 How close are established room-entry techniques, encoded as stylized playbooks, to the best
@@ -35,7 +50,8 @@ For each confirmatory room: evaluate the four playbooks; run CEM (budget to be f
 fast simulator, at least 30 iterations x 32 samples x 4 weights, seeded with the playbooks;
 precondition: search saturation, i.e. the front changes < 2 % over the last 25 % of iterations) with optimizer seeds 0, 1, 2; build the archive per
 seed. Gap per technique and room = relative reduction of `risk_multi` at equal-or-better
-`t_clear` and fratricide (`gap_risk`). The reported gap is the median over the 3 seeds.
+`t_clear` and fratricide (`gap_risk`), computed on held-out threat scenarios after the front
+has been selected on planning scenarios. The reported gap is the median over the 3 seeds.
 
 ## 5. Hypotheses and decision rules
 
@@ -70,3 +86,7 @@ scope, stylized playbooks.
   room generator).
 - 2026-11-02: pilot (REPORT_E1_pilot.md) showed an under-budgeted search in large rooms; the
   confirmatory budget is now tied to a saturation check.
+- 2026-11-02: methodological review R1 (REVIEW_R1.md): added scope/validity section,
+  information model, separation of planning and held-out threat scenarios, parameter
+  provenance (PARAMETERS.md), new sensitivity axes (dwell 0.8 s, threat reaction 1.0 s,
+  small-room threshold). H3 now covers the extended grid.

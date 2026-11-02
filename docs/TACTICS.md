@@ -6,10 +6,17 @@ described in public sources: stack, order, path through the door, point of domin
 sectors and timing. Weapons handling, breaching and anything beyond public descriptions
 are deliberately left out.
 
+**Naming (review R1, P0):** The names (crisscross, buttonhook, …) label *stylized,
+unvalidated movement models* that are loosely based on the cited descriptions. They do not
+claim to reproduce any unit's procedure, and their representativeness is a separate open
+question for an instructor review. Results are model-internal optimization findings.
+
 **Status:**
 - *coded from source*: follows a public description directly.
 - *adapted*: needed my own decisions where the source is not specific, marked below.
 - *SME confirmed*: reviewed by an instructor. None yet; see [SME_REVIEW.md](SME_REVIEW.md).
+  Review R1 ([REVIEW_R1.md](REVIEW_R1.md)) was a source-based methodological review, not an
+  instructor review, and confirms no technique.
 
 Sources are cited as documents and sections. The original text of FM 3-06.11 para. 3-22 has
 not yet been checked line by line against the encodings; the current wording comes from the
