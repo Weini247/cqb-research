@@ -24,6 +24,22 @@ from .viewer3d import to_html as viewer3d_html
 WEIGHTS = (0.01, 0.03, 0.1, 0.3)
 
 
+def _commit() -> str:
+    """Git commit of the code that produced a result (provenance, review R3)."""
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True
+        )
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "src"], capture_output=True, text=True
+        )
+        return out.stdout.strip() + ("+dirty" if dirty.stdout.strip() else "")
+    except OSError:
+        return "unknown"
+
+
 def _replay(room: Room, name: str, pb: Playbook, res: Result) -> dict:
     return {
         "name": name,
@@ -53,22 +69,36 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
         cem(room, team, w, init, archive, iters=iters, pop=pop, seed=seed * 100 + k)
         dt = time.perf_counter() - t0
         log(f"  {room.name} w={w}: {len(archive.rows)} valid evals ({dt:.0f}s)")
-    # the front was selected on planning scenarios; re-score it on held-out scenarios
+    # Primary gap (review R3): ONE candidate per doctrine is chosen on planning scenarios
+    # (lowest planning risk at equal-or-better time and fratricide) and only that candidate is
+    # scored on held-out scenarios. Taking the best of several re-scored candidates would
+    # reintroduce a selection bias (winner's curse); that optimistic value is kept separately.
     held = Archive()
     for i in archive.front():
         held.add(
             evaluate(room, decode(archive.xs[i], room, team), team, cfg=EVAL_CFG), archive.xs[i]
         )
     for d in doc_out:
-        if d["feasible"]:
-            d.update(held.gap(d[optimize.OBJECTIVE], d["t_clear"], d["fratricide"]))
-            d["planning_gap"] = archive.gap(
-                evaluate(
-                    room, decode(encode(docs[doc_out.index(d)], room, team), room, team), team
-                ).objective(optimize.OBJECTIVE),
-                d["t_clear"],
-                d["fratricide"],
-            )["gap_risk"]
+        if not d["feasible"]:
+            continue
+        cand = [
+            i
+            for i, (_, t, fr) in enumerate(archive.rows)
+            if t <= d["t_clear"] + 1e-9 and fr <= d["fratricide"] + 1e-9
+        ]
+        i = min(cand, key=lambda i: archive.rows[i][0])
+        sel = evaluate(room, decode(archive.xs[i], room, team), team, cfg=EVAL_CFG)
+        r_sel = sel.objective(optimize.OBJECTIVE)
+        d["selected_risk"] = round(r_sel, 4)
+        d["gap_selected"] = round(1 - r_sel / d[optimize.OBJECTIVE], 4)  # may be negative
+        opt = held.gap(d[optimize.OBJECTIVE], d["t_clear"], d["fratricide"])
+        d["gap_best_of_front"] = opt["gap_risk"]  # optimistic: max over re-scored front
+        d["risk_best"], d["t_best"], d["gap_time"] = (
+            opt["risk_best"],
+            opt["t_best"],
+            opt["gap_time"],
+        )
+        d["gap_risk"] = d["gap_selected"]
     # "best found" replay: knee of the front at fratricide <= the safest valid doctrine
     valid = [d for d in doc_out if d["feasible"]]
     fr_cap = min((d["fratricide"] for d in valid), default=float("inf"))
@@ -151,6 +181,8 @@ def main(argv: list[str] | None = None) -> None:
             "engage_rate": entry.DEFAULT_CFG.engage_rate,
             "clear_frac": entry.CLEAR_FRAC,
             "runtime_s": round(time.perf_counter() - t0, 1),
+            "commit": _commit(),
+            "backend": optimize.backend(),
         },
         "team": [o.to_dict() for o in team],
         "rooms": results,
