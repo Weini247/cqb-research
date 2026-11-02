@@ -95,4 +95,9 @@ geometry. Before any headline claim, E1 needs:
 
 ## Replication (seed 1)
 
-Pending: `out/bench-e0-s1/`.
+A second optimizer seed (`--seed 1`, same budget) reproduces the picture. Exposure gaps move by
+at most 3 percentage points (L-center buttonhook 11 % -> 8 %), time gaps by up to 15 points
+(L-corner-box crisscross 15 % -> 30 %). All qualitative findings 1-6 hold, including corner-fed
+crisscross at the floor and buttonhook / limited penetration 33-52 % above it.
+M-center-box again yields almost no valid strategies (1 vs. 2). Two seeds show stability of the
+search, not statistical significance. E1 needs more seeds and generated geometries.
