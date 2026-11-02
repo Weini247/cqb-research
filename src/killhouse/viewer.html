@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Killhouse Replay</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --fg:#d8dce3; --muted:#8a919c; --wall:#cfd3da;
+          --floor:#262a31; --corr:#2c3038; --clear:#1f3b2c; --active:#4a3a1c; --out:#101215; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:10px 16px;
+           background:var(--panel); }
+  header b { font-size:15px; }
+  button { background:#333944; color:var(--fg); border:0; border-radius:6px; padding:6px 12px;
+           cursor:pointer; font:inherit; }
+  input[type=range] { flex:1; min-width:160px; }
+  #info { color:var(--muted); font-variant-numeric:tabular-nums; }
+  main { display:flex; flex-wrap:wrap; gap:16px; padding:16px; }
+  canvas { background:var(--out); border-radius:8px; max-width:100%; }
+  #legend { min-width:200px; }
+  .op { display:flex; align-items:center; gap:8px; margin:6px 0; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .small { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <b>Killhouse Replay</b>
+  <button id="play">⏸ Pause</button>
+  <select id="speed"><option>1</option><option selected>4</option><option>8</option><option>16</option></select>
+  <input id="seek" type="range" min="0" value="0">
+  <span id="info"></span>
+</header>
+<main>
+  <canvas id="c"></canvas>
+  <div id="legend"></div>
+</main>
+<script>
+const R = /*__REPLAY__*/null;
+const B = R.building, PAD = 3, CELL = B.cell_m;
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let S = 1;
+function resize() {
+  const maxW = Math.min(window.innerWidth - 32, 900), maxH = window.innerHeight - 90;
+  const cw = B.width_cells + 2 * PAD, ch = B.height_cells + 2 * PAD;
+  S = Math.max(4, Math.floor(Math.min(maxW / cw, maxH / ch)));
+  cv.width = cw * S; cv.height = ch * S;
+}
+const px = m => (m / CELL + PAD) * S;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n);
+function drawBuilding(f) {
+  const cleared = new Set(f.cleared);
+  ctx.fillStyle = css("--out"); ctx.fillRect(0, 0, cv.width, cv.height);
+  for (const r of B.rooms) {
+    ctx.fillStyle = cleared.has(r.id) ? css("--clear") : r.id === f.room ? css("--active")
+                  : r.kind === "corridor" ? css("--corr") : css("--floor");
+    ctx.fillRect((r.x0 + PAD) * S, (r.y0 + PAD) * S, (r.x1 - r.x0 + 1) * S, (r.y1 - r.y0 + 1) * S);
+  }
+  ctx.fillStyle = css("--wall");
+  B.grid.forEach((row, y) => { for (let x = 0; x < row.length; x++)
+    if (row[x] === "#") ctx.fillRect((x + PAD) * S, (y + PAD) * S, S, S); });
+  ctx.fillStyle = "#6fcf97";
+  for (const d of B.doors) if (d.a === -1)
+    for (const [x, y] of d.cells) ctx.fillRect((x + PAD) * S + 1, (y + PAD) * S + 1, S - 2, S - 2);
+}
+function drawOps(f) {
+  f.ops.forEach(([x, y, h, mode], i) => {
+    const o = R.operators[i], cx = px(x), cy = px(y), r = o.radius_m / CELL * S;
+    ctx.fillStyle = o.color + "33";
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r * 6, h - 0.45, h + 0.45); ctx.fill();
+    ctx.fillStyle = o.color; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = "#fff"; ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(h) * r * 1.6, cy + Math.sin(h) * r * 1.6); ctx.stroke();
+  });
+}
+const seek = document.getElementById("seek"), info = document.getElementById("info");
+seek.max = R.frames.length - 1;
+let i = 0, playing = true, acc = 0, last = performance.now();
+const frameDt = R.frames.length > 1 ? R.frames[1].t - R.frames[0].t : 0.2;
+function render() {
+  const f = R.frames[i];
+  drawBuilding(f); drawOps(f);
+  const rooms = B.rooms.length;
+  info.textContent = `t=${f.t.toFixed(1)} s / ${R.meta.duration_s.toFixed(1)} s · Phase: ${f.phase}`
+    + ` · Raum ${f.room} · gesichert ${f.cleared.length}/${rooms}`;
+  seek.value = i;
+}
+function loop(now) {
+  if (playing) {
+    acc += (now - last) / 1000 * +document.getElementById("speed").value;
+    while (acc >= frameDt && i < R.frames.length - 1) { acc -= frameDt; i++; }
+    if (i >= R.frames.length - 1) playing = false, document.getElementById("play").textContent = "▶ Play";
+  }
+  last = now; render(); requestAnimationFrame(loop);
+}
+document.getElementById("play").onclick = e => {
+  if (i >= R.frames.length - 1) i = 0;
+  playing = !playing; e.target.textContent = playing ? "⏸ Pause" : "▶ Play";
+};
+seek.oninput = () => { i = +seek.value; acc = 0; };
+document.getElementById("legend").innerHTML =
+  R.operators.map(o => `<div class="op"><span class="dot" style="background:${o.color}"></span>`
+    + `<span>${o.name} (${o.role})<br><span class="small">r=${o.radius_m} m · ${o.height_m} m · `
+    + `${o.speed_mps} m/s</span></span></div>`).join("")
+  + `<p class="small">${B.width_cells * CELL}×${B.height_cells * CELL} m · ${B.rooms.length} Räume/Flure`
+  + ` · grün = Eingang / gesichert, braun = aktueller Raum</p>`;
+window.addEventListener("resize", resize); resize(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>

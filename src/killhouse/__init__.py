@@ -1,0 +1,1 @@
+"""Killhouse: CQB simulation prototype."""
