@@ -20,7 +20,7 @@ from .optimize import Archive, cem, decode, encode
 from .room import Room, standard_rooms
 from .team import default_team
 
-WEIGHTS = (0.02, 0.06, 0.2, 0.6)
+WEIGHTS = (0.01, 0.03, 0.1, 0.3)
 
 
 def _replay(room: Room, name: str, pb: Playbook, res: Result) -> dict:
@@ -54,7 +54,7 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
         log(f"  {room.name} w={w}: {len(archive.rows)} valid evals ({dt:.0f}s)")
     for d in doc_out:
         if d["feasible"]:
-            d.update(archive.gap(d["exposure"], d["t_clear"], d["fratricide"]))
+            d.update(archive.gap(d["risk"], d["t_clear"], d["fratricide"]))
     # "best found" replay: knee of the front at fratricide <= the safest valid doctrine
     valid = [d for d in doc_out if d["feasible"]]
     fr_cap = min((d["fratricide"] for d in valid), default=float("inf"))
@@ -119,6 +119,9 @@ def main(argv: list[str] | None = None) -> None:
             "half_fov_deg": round(np.degrees(entry.HALF_FOV), 1),
             "dwell": entry.DWELL,
             "turn_rate": entry.TURN_RATE,
+            "threat_react": entry.DEFAULT_CFG.threat_react,
+            "threat_rate": entry.DEFAULT_CFG.threat_rate,
+            "engage_rate": entry.DEFAULT_CFG.engage_rate,
             "clear_frac": entry.CLEAR_FRAC,
             "runtime_s": round(time.perf_counter() - t0, 1),
         },
@@ -130,14 +133,14 @@ def main(argv: list[str] | None = None) -> None:
     tpl = resources.files("killhouse").joinpath("report.html").read_text(encoding="utf-8")
     payload = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     (a.out / "report.html").write_text(tpl.replace("/*__DATA__*/null", payload), encoding="utf-8")
-    print(f"\n{'room':14s} {'doctrine':20s} {'E':>6s} {'T':>5s} {'fr':>4s} {'E*':>6s} {'gapE':>5s}")
+    print(f"\n{'room':14s} {'doctrine':20s} {'R':>6s} {'T':>5s} {'fr':>4s} {'R*':>6s} {'gapR':>5s}")
     for r in results:
         for d in r["doctrines"]:
             if d["feasible"]:
                 print(
-                    f"{r['room']['name']:14s} {d['name']:20s} {d['exposure']:6.3f} "
-                    f"{d['t_clear']:5.1f} {d['fratricide']:4.1f} {d['exposure_best']:6.3f} "
-                    f"{d['gap_exposure'] * 100:4.0f}%"
+                    f"{r['room']['name']:14s} {d['name']:20s} {d['risk']:6.3f} "
+                    f"{d['t_clear']:5.1f} {d['fratricide']:4.1f} {d['risk_best']:6.3f} "
+                    f"{d['gap_risk'] * 100:4.0f}%"
                 )
             else:
                 print(f"{r['room']['name']:14s} {d['name']:20s} invalid (not cleared / collision)")

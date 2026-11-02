@@ -1,11 +1,12 @@
+import dataclasses
 import json
 
 import numpy as np
 
 from killhouse.bench import main as bench_main
 from killhouse.doctrine import doctrines
-from killhouse.entry import OpPlan, Playbook, evaluate
-from killhouse.optimize import Archive, cem, decode, encode
+from killhouse.entry import ModelCfg, OpPlan, Playbook, evaluate
+from killhouse.optimize import Archive, cem, decode, encode, score
 from killhouse.room import Room, los, standard_rooms
 from killhouse.team import default_team
 
@@ -66,9 +67,7 @@ def test_optimizer_not_worse_than_seed():
     seed_scores = []
     for x in init:
         r = evaluate(ROOM, decode(x, ROOM, TEAM), TEAM)
-        seed_scores.append(
-            r.exposure + 0.2 * r.t_clear + 20 * (r.collision + r.wall) + 5 * r.fratricide
-        )
+        seed_scores.append(score(r, 0.2))
     assert best <= min(seed_scores) + 1e-9
     assert arch.front()
 
@@ -79,3 +78,14 @@ def test_bench_quick(tmp_path):
     room = data["rooms"][0]
     assert len(room["doctrines"]) == 4 and room["front"]
     assert "/*__DATA__*/null" not in (tmp_path / "report.html").read_text(encoding="utf-8")
+
+
+def test_threat_model_rewards_more_guns_and_faster_engagement():
+    pb = doctrines(ROOM, TEAM)[0]
+    two = Playbook("2", [dataclasses.replace(o, enter=i < 2) for i, o in enumerate(pb.ops)])
+    four, pair = evaluate(ROOM, pb, TEAM), evaluate(ROOM, two, TEAM)
+    assert 0.0 < four.risk < 1.0
+    assert four.risk <= pair.risk  # extra entrants help neutralize, they are not pure exposure
+    fast = evaluate(ROOM, pb, TEAM, cfg=ModelCfg(engage_rate=8.0))
+    slow = evaluate(ROOM, pb, TEAM, cfg=ModelCfg(engage_rate=2.0))
+    assert fast.risk < four.risk < slow.risk

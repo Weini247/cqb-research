@@ -38,10 +38,19 @@ Sub-questions:
   instant: without dwell, standing in the doorway would clear a centre-fed room in 0.3 s at zero
   exposure, which is the opposite of the fatal-funnel experience).
 
+- **Duel model (E1 draft).** For a single hidden threat at a uniformly random position: once
+  it has had an operator in view for `threat_react = 0.3 s` it hits the team at
+  `threat_rate = 1/s` while it still sees someone; after detection it is neutralized at
+  `engage_rate = 4/s` per operator currently aiming at it. Risk `R` is the resulting
+  probability that the team takes a hit. This replaces raw exposure as the primary objective:
+  with exposure alone, extra entrants only add exposure and never help, so the optimizer kept
+  #3/#4 outside. All three rates are sensitivity axes; only relative results are meaningful.
+
 ## Metrics
 
 | metric | definition |
 |---|---|
+| risk `R` | P(team hit) under the duel model, averaged over threat positions (primary) |
 | exposure `E` | sum over operators and time of the fraction of floor points that are still uncleared and have line of sight to the operator (seconds of whole-room exposure) |
 | time to clear `T` | first time at which <= 0.5 % of points are uncleared |
 | collision | integrated body overlap between operators (m*s) |
@@ -49,16 +58,16 @@ Sub-questions:
 | fratricide | time an inside operator's muzzle line (+-7 deg) covers a visible teammate |
 
 A strategy is valid if collision and wall < 0.02 and the room is cleared within the 12 s
-horizon. Strategies are compared on the Pareto front of (E, T). The **optimality gap** of a
-technique is the relative exposure reduction that the best valid found strategy achieves at
-equal-or-better time *and* equal-or-lower fratricide (`gap_exposure`); `gap_time` is the
-analogue for time at equal-or-better exposure. Constraining fratricide relative to the doctrine
+horizon. Strategies are compared on the Pareto front of (R, T). The **optimality gap** of a
+technique is the relative risk reduction that the best valid found strategy achieves at
+equal-or-better time *and* equal-or-lower fratricide (`gap_risk`); `gap_time` is the
+analogue for time at equal-or-better risk. Constraining fratricide relative to the doctrine
 avoids tuning a hard threshold.
 
 ## Optimizer
 
 Cross-entropy method over the 36-dim plan vector (9 per operator), seeded with the doctrine encodings,
-scalarized `E + w*T + penalties` for several `w`; every feasible evaluation enters an archive
+scalarized `R + w*T + penalties` for several `w`; every feasible evaluation enters an archive
 whose non-dominated set is the reported front. "Best found", not proven optimal.
 
 ## Known limitations (to be stated in every result)

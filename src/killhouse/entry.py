@@ -1,4 +1,4 @@
-"""Single-room entry model: operator plans -> trajectories -> exposure / time-to-clear metrics.
+"""Single-room entry model: operator plans -> trajectories -> risk / time-to-clear metrics.
 
 See docs/CONCEPT.md for definitions. Everything is vectorized over time with numpy.
 """
@@ -26,6 +26,21 @@ STACK_GAP = 0.75
 CLEAR_FRAC = 0.005  # room counts as cleared when <= 0.5 % of threat positions are unseen
 
 
+@dataclass(frozen=True)
+class ModelCfg:
+    """Perception and duel parameters (sensitivity axes, see docs/CONCEPT.md)."""
+
+    half_fov: float = HALF_FOV
+    dwell: float = DWELL
+    turn_rate: float = TURN_RATE
+    threat_react: float = 0.3  # s a threat needs an operator in view before it can fire
+    threat_rate: float = 1.0  # 1/s hit rate of a ready, unengaged threat on the team
+    engage_rate: float = 4.0  # 1/s neutralization rate per operator aiming at a detected threat
+
+
+DEFAULT_CFG = ModelCfg()
+
+
 @dataclass
 class OpPlan:
     side: int  # -1 stacked left of the door, +1 right
@@ -48,6 +63,8 @@ class Playbook:
 
 @dataclass
 class Result:
+    risk: float  # P(team takes a hit) for one threat at a uniformly random hidden position
+    threat_alive: float  # P(threat still active at the horizon)
     exposure: float
     t_clear: float
     uncleared_end: float
@@ -65,6 +82,8 @@ class Result:
 
     def metrics(self) -> dict:
         return {
+            "risk": round(self.risk, 4),
+            "threat_alive": round(self.threat_alive, 4),
             "exposure": round(self.exposure, 4),
             "t_clear": round(self.t_clear, 3),
             "uncleared_end": round(self.uncleared_end, 4),
@@ -122,7 +141,7 @@ def _keyframes(room: Room, op: Operator, plan: OpPlan):
     return np.array(ts), np.array(ps), t_thr, ts[-1]
 
 
-def trajectories(room: Room, team: list[Operator], pb: Playbook):
+def trajectories(room: Room, team: list[Operator], pb: Playbook, cfg: ModelCfg = DEFAULT_CFG):
     t = np.arange(NT) * DT
     n = len(team)
     pos = np.zeros((NT, n, 2))
@@ -142,7 +161,7 @@ def trajectories(room: Room, team: list[Operator], pb: Playbook):
             else:
                 tgt = plan.gaze1 if phase[k, i] == 1 else plan.gaze2
             diff = (tgt - g + math.pi) % (2 * math.pi) - math.pi
-            g += max(-TURN_RATE * DT, min(TURN_RATE * DT, diff))
+            g += max(-cfg.turn_rate * DT, min(cfg.turn_rate * DT, diff))
             gaze[k, i] = g
     return pos, gaze, phase
 
@@ -152,18 +171,39 @@ def _door_los(room: Room, a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return _through_door(room, a[:, 0], a[:, 1], b[:, 0], b[:, 1])
 
 
-def evaluate(room: Room, pb: Playbook, team: list[Operator], keep: bool = False) -> Result:
-    pos, gaze, phase = trajectories(room, team, pb)
+def evaluate(
+    room: Room,
+    pb: Playbook,
+    team: list[Operator],
+    keep: bool = False,
+    cfg: ModelCfg = DEFAULT_CFG,
+) -> Result:
+    pos, gaze, phase = trajectories(room, team, pb, cfg)
     q = room.points()
     m, n = len(q), len(team)
     p = pos.reshape(-1, 2)
     vis = los(room, p, q).reshape(NT, n, m)
     ang = np.arctan2(q[None, :, 1] - p[:, 1, None], q[None, :, 0] - p[:, 0, None])
-    fov = np.abs(wrap(ang.reshape(NT, n, m) - gaze[..., None])) <= HALF_FOV
-    seen = np.cumsum((vis & fov).any(axis=1), axis=0) >= max(1, round(DWELL / DT))
+    fov = np.abs(wrap(ang.reshape(NT, n, m) - gaze[..., None])) <= cfg.half_fov
+    looked = vis & fov
+    seen = np.cumsum(looked.any(axis=1), axis=0) >= max(1, round(cfg.dwell / DT))
     first = np.where(seen.any(0), seen.argmax(0), NT)
-    alive = np.arange(NT)[:, None] < first[None, :]
+    alive = np.arange(NT)[:, None] < first[None, :]  # not yet detected
     exposure = float((vis & alive[:, None, :]).sum()) / m * DT
+
+    # Duel per threat position: a threat that has had an operator in view for threat_react
+    # hits the team at threat_rate until neutralized; neutralization needs detection and then
+    # runs at engage_rate per operator currently aiming at it (more guns on a sector help).
+    sees = vis.any(axis=1)
+    ready = np.cumsum(sees, axis=0) >= max(1, round(cfg.threat_react / DT))
+    h = np.where(ready & sees, 1 - math.exp(-cfg.threat_rate * DT), 0.0)
+    engaged = looked.sum(axis=1) * ~alive
+    q = 1 - np.exp(-cfg.engage_rate * DT * engaged)
+    surv = np.cumprod((1 - h) * (1 - q), axis=0)
+    before = np.vstack([np.ones((1, m)), surv[:-1]])  # threat active and team unhurt
+    risk = float((before * h).sum(0).mean())
+    hit_free = np.cumprod(1 - h, axis=0)[-1]
+    threat_alive = float((np.prod(1 - q, axis=0) * hit_free).mean())
     unc = alive.mean(1)
     done = np.nonzero(unc <= CLEAR_FRAC)[0]
     t_clear = float(done[0] * DT) if done.size else HORIZON + 10 * float(unc[-1])
@@ -194,7 +234,14 @@ def evaluate(room: Room, pb: Playbook, team: list[Operator], keep: bool = False)
             mask = aim & (phase[:, i] >= 1) & _door_los(room, pos[:, i], pos[:, j])
             fratricide += float(mask.sum())
     res = Result(
-        exposure, t_clear, float(unc[-1]), collision * DT, float(wall.sum()) * DT, fratricide * DT
+        risk,
+        threat_alive,
+        exposure,
+        t_clear,
+        float(unc[-1]),
+        collision * DT,
+        float(wall.sum()) * DT,
+        fratricide * DT,
     )
     if keep:
         res.pos, res.gaze, res.first_seen = pos, gaze, first

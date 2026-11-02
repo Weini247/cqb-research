@@ -46,11 +46,11 @@ def encode(pb: Playbook, room: Room, team: list[Operator]) -> np.ndarray:
 
 
 def score(res: Result, w: float) -> float:
-    return res.exposure + w * res.t_clear + 20 * (res.collision + res.wall) + 5 * res.fratricide
+    return res.risk + w * res.t_clear + 20 * (res.collision + res.wall) + 5 * res.fratricide
 
 
 class Archive:
-    """All valid evaluations as rows (exposure, t_clear, fratricide) + plan vectors."""
+    """All valid evaluations as rows (risk, t_clear, fratricide) + plan vectors."""
 
     def __init__(self) -> None:
         self.rows: list[tuple[float, float, float]] = []
@@ -58,11 +58,11 @@ class Archive:
 
     def add(self, res: Result, x: np.ndarray) -> None:
         if res.feasible:
-            self.rows.append((res.exposure, res.t_clear, res.fratricide))
+            self.rows.append((res.risk, res.t_clear, res.fratricide))
             self.xs.append(x.copy())
 
     def front(self, fr_max: float = math.inf) -> list[int]:
-        """Indices of the (exposure, t_clear) Pareto front among rows with fratricide <= fr_max."""
+        """Indices of the (risk, t_clear) Pareto front among rows with fratricide <= fr_max."""
         idx = [i for i, r in enumerate(self.rows) if r[2] <= fr_max + 1e-9]
         out, best_e = [], math.inf
         for i in sorted(idx, key=lambda i: (self.rows[i][1], self.rows[i][0])):
@@ -72,14 +72,14 @@ class Archive:
         return out
 
     def gap(self, e: float, t: float, fr: float) -> dict:
-        """Best found vs a reference point at equal-or-better time / exposure / fratricide."""
+        """Best found vs a reference point at equal-or-better time / risk / fratricide."""
         ok = [r for r in self.rows if r[2] <= fr + 1e-9]
         e_star = min([r[0] for r in ok if r[1] <= t + 1e-9], default=e)
         t_star = min([r[1] for r in ok if r[0] <= e + 1e-9], default=t)
         return {
-            "exposure_best": round(e_star, 4),
+            "risk_best": round(e_star, 4),
             "t_best": round(t_star, 3),
-            "gap_exposure": round(max(0.0, 1 - e_star / e), 4) if e > 0 else 0.0,
+            "gap_risk": round(max(0.0, 1 - e_star / e), 4) if e > 0 else 0.0,
             "gap_time": round(max(0.0, 1 - t_star / t), 4) if t > 0 else 0.0,
         }
 
