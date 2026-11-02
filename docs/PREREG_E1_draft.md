@@ -21,6 +21,9 @@ number is computed on held-out threat scenarios *and* held-out rooms.
 
 ## 1. Research question
 
+**Main question:** How strongly do comparisons of coordinated multi-agent search strategies depend on model assumptions, information access and the evaluation protocol? E1 examines it on the case study below.
+
+
 How close are established room-entry techniques, encoded as stylized playbooks, to the best
 strategies a black-box optimizer finds in the same plan space? And which room features decide
 the size of the gap?

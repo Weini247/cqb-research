@@ -2,9 +2,10 @@
 
 ## Goal
 
-**Research question:** How close are published room-entry techniques (as described in public
-manuals) to the best strategies found in a simulation? And can robust, learnable, better
-techniques be found automatically?
+**Main question (since review R3):** How strongly do comparisons of coordinated multi-agent search strategies depend on model assumptions, information access and the evaluation protocol?
+
+**Case study:** published room-entry techniques vs. the best strategies found in the same
+model. Discovering new techniques is deferred until after the first study (dual use).
 
 **Framing:** coordinated multi-agent search under visibility constraints; CQB is the case
 study. Transfer to search-and-rescue, fire service and robot teams.

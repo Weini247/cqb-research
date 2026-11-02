@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "cqb-research: coordinated search under visibility constraints"
+authors:
+  - alias: "Weini247"
+version: 0.1.0
+date-released: 2026-11-02
+repository-code: "https://github.com/Weini247/cqb-research"

@@ -1,62 +1,62 @@
-# Killhouse
+# cqb-research
 
-**How close are established CQB room-entry techniques to the optimum?**
-A simulation study of coordinated multi-agent search under visibility constraints, with
-close-quarters room entry as the case study. Research concept: [docs/CONCEPT.md](docs/CONCEPT.md),
-results: [E0](docs/REPORT_E0.md) (exposure model) and
-[E1 draft](docs/REPORT_E1_draft.md) (duel threat model, sensitivity analysis),
-[E1 pilot](docs/REPORT_E1_pilot.md) (several threats, dead space). Plan: [ROADMAP](docs/ROADMAP.md).
+**How strongly do comparisons of coordinated multi-agent search strategies depend on model
+assumptions, information access and the evaluation protocol?**
 
-## Entry benchmark (single room)
+A research simulator for coordinated search under visibility constraints. The case study:
+stylized models of published close-quarters room-entry techniques, compared with the best
+strategies an optimizer finds in the same model. Status: **exploratory research code**,
+not a validated tactical model. See [Scope and ethics](ETHICS.md).
 
-- `room.py`: rectangular rooms, door channel with wall thickness, furniture boxes, line of sight
-- `entry.py`: 4-operator plans (stack, entry timing, threshold point, point of domination,
-  gaze with turn-rate limit, pie slicing) -> trajectories -> duel risk, exposure, time to
-  clear, collision, wall, fratricide
-- `doctrine.py`: stylized crisscross, buttonhook, pie + crisscross, limited penetration
-- `tactics.py`: tactic catalog with sources and review status ([TACTICS.md](docs/TACTICS.md)),
-  team sizes 2-4, execution noise and robustness evaluation (`killhouse-tactics`)
-- `optimize.py`: cross-entropy search in the same 36-dim plan space, Pareto archive, gap metric
-- `sensitivity.py`: one-at-a-time robustness of the doctrine ranking (8 model/geometry axes)
-- `bench.py` + `report.html`: results JSON and a self-contained report (Pareto plot +
-  synchronized replays with uncleared threat positions)
-- `viewer3d.py` + `viewer3d.html`: three.js greybox viewer (prototype grid materials,
-  analysis capsules (exact simulated body + footprint) or a jointed test dummy for showcase
-  renders, both scaled to each operator, vision fans, ghost overlay of a second technique,
-  oblique / top / follow camera, adjustable cutaway wall height). Needs WebGL and the jsDelivr CDN.
+| Apartment clearing (3D greybox viewer) | Single-room entry, stylized technique vs. best found (ghost) |
+|---|---|
+| ![apartment](docs/media/apartment.gif) | ![room entry](docs/media/room-entry.gif) |
 
-```
-python -m uv sync
-python -m uv run killhouse-bench --out out/bench-e1      # ~18 min, single core
-python -m uv run killhouse-sens                          # ~15 s
-python -m uv run killhouse-3d out/bench-e1/results.json  # -> out/bench-e1/viewer3d.html
-python -m uv run killhouse-bench --quick --rooms M-center  # smoke run
-```
+## What is in here
 
-## Apartments (multi-room)
+- **Geometry:** rooms with door channels and wall thickness; generated apartments with a
+  hallway, door swing, closed doors, furniture and a kitchen pass-through; line of sight via
+  precomputed visibility.
+- **Agents:** four operators with individual body sizes and speeds, a gaze turn-rate limit,
+  a vision cone and a perception dwell time.
+- **Threat model:** an abstract duel. Hidden threats react, hit at a rate, and are neutralized
+  only after detection and identification. Several threats per scenario. No ballistics.
+- **Techniques:** 8 stylized encodings with source and status
+  ([TACTICS.md](docs/TACTICS.md)); team sizes 2-4; execution noise.
+- **Optimization:** cross-entropy search in the same plan space, Pareto archive, planning vs.
+  held-out threat scenarios, one pre-selected candidate per technique (no winner's curse).
+  Optional batched GPU evaluation (PyTorch).
+- **Analyses:** sensitivity, robustness to execution noise, an adversary who knows the plan
+  (price of predictability).
+- **Viewer:** a self-contained three.js page with ghost overlay, cutaway walls, threat markers
+  and door states.
 
-- `geom.py`: floorplans as blocking boxes (walls, open door leaves, furniture), precomputed
-  visibility, A* walking grid
-- `apartment.py`: apartment generator (hallway, 4-6 rooms, door swing, wardrobes, landing)
-- `clearing.py`: room-by-room clearing with the playbooks in each door's local frame, rear
-  security in the hallway, risk over the whole episode ([report](docs/REPORT_APARTMENT_v0.md))
+## Quickstart
 
-```
-python -m uv run killhouse-apartment --seeds 1 3 5 --out out/apartment   # + viewer3d.html
-```
-
-## Building spike (spike 1)
-
-- `building.py`: procedural building (default 30×40 m, 0.5 m grid, BSP rooms, 2 m corridors,
-  doors via spanning tree + corridor links + loops, 3 outer entrances)
-- `team.py`: 4 operators with different radius/height/speed
-- `sim.py`: team state machine per room: transit → stack → crisscross entry → clear corners → next
-- `replay.py` + `viewer.html`: replay JSON (`killhouse.replay/1`) and a standalone canvas player
-
-```
-python -m uv run killhouse --seed 7 --out out   # out/replay.json, out/replay.html
+```bash
+python -m uv sync                      # numpy-only; add --extra gpu for the PyTorch backend
 python -m uv run pytest
-python -m uv run ruff check .
+python -m uv run killhouse-bench --quick --rooms M-center --out out/demo   # report.html + viewer3d.html
+python -m uv run killhouse-apartment --seeds 5 --out out/apartment         # apartment + viewer3d.html
 ```
 
-The building spike has no line of sight or collisions yet; the E0 model does.
+## Research state
+
+| document | content |
+|---|---|
+| [BIG_PICTURE](docs/BIG_PICTURE.md) | goal, status, main findings, weaknesses |
+| [CLAIMS](docs/CLAIMS.md) | every claim with status (supported / hypothesis / retracted) and evidence |
+| [PARAMETERS](docs/PARAMETERS.md) | provenance of every model parameter (empirical / geometric / free) |
+| [PREREG_E1_draft](docs/PREREG_E1_draft.md) | draft preregistration (not frozen) |
+| [RUNLOG](docs/RUNLOG.md) | which results were known at which model state |
+| [REVIEW_R1](docs/REVIEW_R1.md), [R2](docs/REVIEW_R2.md), [R3](docs/REVIEW_R3.md) | AI-assisted methodological reviews and responses |
+| [ROADMAP](docs/ROADMAP.md) | stages and milestones |
+
+All findings so far are **exploratory and model-internal**. Most parameters are free
+modelling choices; technique names denote stylized movement models, not verified procedures.
+Two reviews found real methodological errors (an information leak and a selection bias); both
+are fixed and documented.
+
+## Licence
+
+No licence has been chosen yet. Until then, the default copyright applies.

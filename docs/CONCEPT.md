@@ -1,4 +1,9 @@
-# Concept: How close are established CQB room-entry techniques to the optimum?
+# Concept
+
+**Main question (since review R3):** How strongly do comparisons of coordinated multi-agent search strategies depend on model assumptions, information access and the evaluation protocol?
+
+**Case study:** published CQB room-entry techniques compared with the best strategies found in the
+same model (originally the main question: "How close are established techniques to the optimum?").
 
 Status: exploratory. Current model version: see `docs/RUNLOG.md` (plan space 52 dimensions,
 13 per operator; primary outcome `risk_multi`). This document originally described E0. Nothing here is preregistered yet; E0 exists to make the model,

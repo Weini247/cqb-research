@@ -405,9 +405,15 @@ function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   const dur = (rep.pos.length - 1) * DT;
   if (playing) { t += dt * +$("speed").value; if (t > dur + 1.0) t = 0; }
+  update(playing ? dt : 0);
+  requestAnimationFrame(frame);
+}
+
+function update(dtAnim) {
+  const dur = (rep.pos.length - 1) * DT;
   const tc = Math.min(t, dur);
-  const k = pose(team, rep, tc, playing ? dt : 0);
-  if (ghostRep) pose(ghostTeam, ghostRep, tc, playing ? dt : 0);
+  const k = pose(team, rep, tc, dtAnim);
+  if (ghostRep) pose(ghostTeam, ghostRep, tc, dtAnim);
   rep.first_seen.forEach((fs, j) => dots.setColorAt(j, k < fs ? RED : GREEN));
   doorMeshes.forEach(({ d, panel, leaf }, i) => {
     const to = rep.door_open ? rep.door_open[i] : -1;
@@ -426,7 +432,6 @@ function frame(now) {
   $("seek").value = Math.round(tc / dur * 1000);
   $("time").textContent = `t = ${tc.toFixed(1)} s`;
   renderer.render(scene, camera);
-  requestAnimationFrame(frame);
 }
 
 function resize() {
@@ -451,7 +456,13 @@ $("fig").onclick = () => {
   const keep = t; loadTech(+$("tech").value); t = keep;
 };
 
-window.killhouse = { scene, camera, controls };  // for debugging in the console
+window.killhouse = {  // console / recording hooks
+  scene, camera, controls,
+  setTime(v) { t = v; playing = false; },
+  snap() { renderer.render(scene, camera); return canvas.toDataURL("image/png"); },
+  renderAt(v, dtAnim = 0) { t = v; playing = false; update(dtAnim); return canvas.toDataURL("image/png"); },
+  duration: () => (rep.pos.length - 1) * DT,
+};
 resize();
 const start = Math.max(0, D.rooms.findIndex(r => r.room.name === "L-corner" || r.room.boxes));
 $("room").value = start; loadRoom(start);
