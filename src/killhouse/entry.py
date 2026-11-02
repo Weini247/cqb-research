@@ -39,9 +39,12 @@ class ModelCfg:
     engage_rate: float = 4.0  # 1/s neutralization rate per operator aiming at a detected threat
     n_threats: int = 2  # threats per scenario for the multi-threat risk
     n_scenarios: int = 32  # sampled threat placements (common random numbers per room)
+    scenario_salt: int = 0  # 0 = planning scenarios (optimizer); EVAL_CFG uses held-out ones
 
 
 DEFAULT_CFG = ModelCfg()
+# Reported numbers use threat placements no plan was tuned on (see docs/PREREG_E1_draft.md)
+EVAL_CFG = ModelCfg(scenario_salt=1)
 
 
 @dataclass
@@ -195,7 +198,7 @@ def _door_los(room: Room, a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 def threat_sets(room: Room, m: int, cfg: ModelCfg) -> np.ndarray:
     """Fixed threat placements per room (common random numbers across all plans)."""
-    rng = np.random.default_rng(zlib.crc32(room.name.encode()))
+    rng = np.random.default_rng([zlib.crc32(room.name.encode()), cfg.scenario_salt])
     k = min(cfg.n_threats, m)
     return np.array([rng.choice(m, size=k, replace=False) for _ in range(cfg.n_scenarios)])
 

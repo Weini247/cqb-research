@@ -15,7 +15,7 @@ import numpy as np
 
 from . import entry, optimize
 from .doctrine import doctrines
-from .entry import Playbook, Result, evaluate
+from .entry import EVAL_CFG, Playbook, Result, evaluate
 from .optimize import Archive, cem, decode, encode
 from .room import Room, generated_rooms, standard_rooms
 from .team import default_team
@@ -43,8 +43,8 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
     archive = Archive()
     doc_out, replays = [], []
     for pb in docs:
-        res = evaluate(room, pb, team, keep=True)
-        archive.add(res, encode(pb, room, team))
+        archive.add(evaluate(room, pb, team), encode(pb, room, team))  # planning scenarios
+        res = evaluate(room, pb, team, keep=True, cfg=EVAL_CFG)  # held-out scenarios
         doc_out.append({"name": pb.name, **res.metrics()})
         replays.append(_replay(room, pb.name, pb, res))
     init = [encode(pb, room, team) for pb in docs]
@@ -53,9 +53,22 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
         cem(room, team, w, init, archive, iters=iters, pop=pop, seed=seed * 100 + k)
         dt = time.perf_counter() - t0
         log(f"  {room.name} w={w}: {len(archive.rows)} valid evals ({dt:.0f}s)")
+    # the front was selected on planning scenarios; re-score it on held-out scenarios
+    held = Archive()
+    for i in archive.front():
+        held.add(
+            evaluate(room, decode(archive.xs[i], room, team), team, cfg=EVAL_CFG), archive.xs[i]
+        )
     for d in doc_out:
         if d["feasible"]:
-            d.update(archive.gap(d[optimize.OBJECTIVE], d["t_clear"], d["fratricide"]))
+            d.update(held.gap(d[optimize.OBJECTIVE], d["t_clear"], d["fratricide"]))
+            d["planning_gap"] = archive.gap(
+                evaluate(
+                    room, decode(encode(docs[doc_out.index(d)], room, team), room, team), team
+                ).objective(optimize.OBJECTIVE),
+                d["t_clear"],
+                d["fratricide"],
+            )["gap_risk"]
     # "best found" replay: knee of the front at fratricide <= the safest valid doctrine
     valid = [d for d in doc_out if d["feasible"]]
     fr_cap = min((d["fratricide"] for d in valid), default=float("inf"))
@@ -65,7 +78,7 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
         t0 = min(archive.rows[i][1] for i in knee_front)
         i = min(knee_front, key=lambda i: archive.rows[i][0] / e0 + archive.rows[i][1] / t0)
         pb = decode(archive.xs[i], room, team)
-        res = evaluate(room, pb, team, keep=True)
+        res = evaluate(room, pb, team, keep=True, cfg=EVAL_CFG)
         replays.append(_replay(room, "best found (knee)", pb, res))
     front_idx = archive.front()
     front = [list(archive.rows[i]) for i in front_idx]

@@ -18,7 +18,7 @@ import numpy as np
 
 from . import doctrine
 from .doctrine import _plan
-from .entry import Playbook, evaluate
+from .entry import EVAL_CFG, Playbook, evaluate
 from .room import Room, standard_rooms
 from .team import Operator, default_team
 
@@ -246,7 +246,7 @@ def robust_eval(room, pb, team, k=16, nz: Noise | None = None, seed=0, key="risk
     rng = np.random.default_rng(seed)
     vals, valid, unseen = [], 0, 0
     for _ in range(k):
-        res = evaluate(room, perturb(pb, room, rng, nz), team)
+        res = evaluate(room, perturb(pb, room, rng, nz), team, cfg=EVAL_CFG)
         vals.append(res.objective(key))
         valid += res.feasible
         unseen += res.uncleared_end > 0.005
@@ -272,7 +272,7 @@ def main(argv: list[str] | None = None) -> None:
     for room in standard_rooms():
         for t in CATALOG:
             pb = build(t.id, room, team)
-            res = evaluate(room, pb, team)
+            res = evaluate(room, pb, team, cfg=EVAL_CFG)
             rob = robust_eval(room, pb, team, k=a.noise_samples)
             rows.append(
                 {"room": room.name, "tactic": t.id, "team": 4, **res.metrics(), "noise": rob}
@@ -287,7 +287,7 @@ def main(argv: list[str] | None = None) -> None:
         for tid in ("crisscross", "buttonhook"):
             for n in (2, 3, 4):
                 sub = team[:n]
-                res = evaluate(room, build(tid, room, sub), sub)
+                res = evaluate(room, build(tid, room, sub), sub, cfg=EVAL_CFG)
                 sizes.append({"room": room.name, "tactic": tid, "team": n, **res.metrics()})
                 print(
                     f"team size {n}: {room.name:9s} {tid:11s} "

@@ -25,6 +25,7 @@ from .entry import (
     CLEAR_FRAC,
     DEFAULT_CFG,
     DT,
+    EVAL_CFG,
     ModelCfg,
     OpPlan,
     Playbook,
@@ -281,7 +282,7 @@ def evaluate_episode(
     grid: Grid,
     vmat: np.ndarray,
     q: np.ndarray,
-    cfg: ModelCfg = DEFAULT_CFG,
+    cfg: ModelCfg = EVAL_CFG,
 ) -> dict:
     nt, n, _ = ep.pos.shape
     m = len(q)

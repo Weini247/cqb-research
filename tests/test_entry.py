@@ -126,3 +126,28 @@ def test_generated_rooms_deterministic_and_sane():
     assert a == b and len({r.name for r in a}) == 6
     for r in a:
         assert 0 < r.door_x0 < r.door_x1 <= r.w and len(r.points()) > 50
+
+
+def test_information_model_plans_never_see_sampled_threats(monkeypatch):
+    """Playbooks (incl. the dead-space step) may use the floorplan, never threat placements."""
+    import killhouse.entry as entry_mod
+
+    room = next(r for r in standard_rooms() if r.name == "M-center-box")
+    base = [pb.ops for pb in doctrines(room, TEAM)]
+    rng = np.random.default_rng(99)
+    monkeypatch.setattr(
+        entry_mod,
+        "threat_sets",
+        lambda room, m, cfg: rng.integers(0, m, size=(cfg.n_scenarios, cfg.n_threats)),
+    )
+    assert [pb.ops for pb in doctrines(room, TEAM)] == base
+
+
+def test_planning_and_evaluation_scenarios_differ():
+    from killhouse.entry import DEFAULT_CFG, EVAL_CFG, threat_sets
+
+    a, b = threat_sets(ROOM, 200, DEFAULT_CFG), threat_sets(ROOM, 200, EVAL_CFG)
+    assert a.shape == b.shape and not np.array_equal(a, b)
+    pb = doctrines(ROOM, TEAM)[0]
+    r0, r1 = evaluate(ROOM, pb, TEAM), evaluate(ROOM, pb, TEAM, cfg=EVAL_CFG)
+    assert r0.risk == r1.risk  # the single-threat risk is an exact expectation, no sampling

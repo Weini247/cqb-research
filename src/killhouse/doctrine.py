@@ -118,7 +118,7 @@ def with_dead_space_step(
     unseen = q[base.first_seen >= NT]
     entered = [i for i, o in enumerate(pb.ops) if o.enter]
     order = sorted(entered, key=lambda i: (pb.ops[i].slot == 0, i))  # #3/#4 first
-    best, best_key = pb, (base.uncleared_end, base.risk_multi)
+    best, best_key = pb, (base.uncleared_end, base.risk)
     if not len(unseen):
         return pb
     for i in order[:2]:
@@ -149,7 +149,7 @@ def with_dead_space_step(
             )
             cand = Playbook(pb.name + "+dead-space", ops)
             res = evaluate(room, cand, team)
-            key = (max(res.uncleared_end, 0.0 if strict else CLEAR_FRAC), res.risk_multi)
+            key = (max(res.uncleared_end, 0.0 if strict else CLEAR_FRAC), res.risk)
             # no worse physically than the base plan (a door leaf may already touch its path)
             ok = res.collision < max(0.02, base.collision + 0.01)
             ok &= res.wall < max(0.02, base.wall + 0.01)

@@ -12,6 +12,7 @@ import math
 from itertools import combinations
 from pathlib import Path
 
+from . import doctrine
 from .doctrine import doctrines
 from .entry import DEFAULT_CFG, ModelCfg, evaluate
 from .optimize import OBJECTIVE
@@ -20,13 +21,14 @@ from .team import Operator, default_team
 
 AXES: dict[str, list] = {
     "half_fov_deg": [40, 60],
-    "dwell": [0.2, 0.5],
+    "dwell": [0.2, 0.5, 0.8],
     "turn_rate": [3.0, 6.0],
-    "threat_react": [0.15, 0.6],
+    "threat_react": [0.15, 0.6, 1.0],
     "threat_rate": [0.5, 2.0],
     "engage_rate": [2.0, 8.0],
     "door_w": [0.8, 1.2],
     "body_scale": [0.85, 1.15],
+    "small_room_w": [3.5, 5.5],  # threshold below which only #1/#2 enter (doctrine rule)
 }
 
 
@@ -48,12 +50,24 @@ def _variant(axis: str | None, value) -> tuple[ModelCfg, list[Room], list[Operat
     return cfg, rooms, team
 
 
-def ranking(cfg: ModelCfg, rooms: list[Room], team: list[Operator]) -> dict[str, dict]:
+def ranking(
+    cfg: ModelCfg, rooms: list[Room], team: list[Operator], small_room_w: float | None = None
+) -> dict[str, dict]:
+    old = doctrine.SMALL_ROOM_W
+    if small_room_w is not None:
+        doctrine.SMALL_ROOM_W = small_room_w
+    try:
+        return _ranking(cfg, rooms, team)
+    finally:
+        doctrine.SMALL_ROOM_W = old
+
+
+def _ranking(cfg: ModelCfg, rooms: list[Room], team: list[Operator]) -> dict[str, dict]:
     out = {}
     for room in rooms:
         rows = {}
         for pb in doctrines(room, team):
-            res = evaluate(room, pb, team, cfg=cfg)
+            res = evaluate(room, pb, team, cfg=dataclasses.replace(cfg, scenario_salt=1))
             rows[pb.name] = res.objective(OBJECTIVE) if res.feasible else math.inf
         out[room.name] = rows
     return out
@@ -81,7 +95,8 @@ def main(argv: list[str] | None = None) -> None:
     print(f"{'axis':14s} {'value':>6s} {'tau':>5s} {'best same':>9s}  changed rooms")
     for axis, values in AXES.items():
         for value in values:
-            rk = ranking(*_variant(axis, value))
+            srw = value if axis == "small_room_w" else None
+            rk = ranking(*_variant(axis, value), small_room_w=srw)
             taus = [kendall(base[r], rk[r]) for r in base]
             taus = [t for t in taus if not math.isnan(t)]
             changed = [r for r in base if min(rk[r], key=rk[r].get) != best[r]]
