@@ -7,14 +7,14 @@ Nothing here is confirmatory (see RUNLOG.md).
 
 | # | claim | status | evidence (file, commit) | open check |
 |---|---|---|---|---|
-| C1 | Crisscross < buttonhook in pairwise risk comparisons across 20 one-at-a-time variants (164/165) | supported (exploratory) | `out/sensitivity-r1.json`, 1166aaf | interactions between axes; common denominator |
+| C1 | Crisscross < buttonhook in pairwise risk comparisons across 20 one-at-a-time variants (164/165) | supported (exploratory) | `out/sensitivity-r1.json`, 4cb99f3 | interactions between axes; common denominator |
 | C2 | Pie + crisscross < crisscross (164/164) at 2.5-3 s more time | supported (exploratory) | same | as C1 |
-| C3 | The optimizer finds lower-risk strategies than every stylized technique (1-54 %) | supported, **low reliability** | `out/bench-r3`, `out/bench-r3-s1`, 66b6875 | seeds differ by up to 20 points; 5 seeds + saturation check |
+| C3 | The optimizer finds lower-risk strategies than every stylized technique (1-54 %) | supported, **low reliability** | `out/bench-r3`, `out/bench-r3-s1`, f4f44ee | seeds differ by up to 20 points; 5 seeds + saturation check |
 | C4 | "Gaps only for corner-fed / small rooms; 0 % for centre-fed" | **retracted** | an artefact of too small a budget (bench-r1 vs. bench-r3) | — |
-| C5 | In apartments, limited penetration + dead-space step has the lowest risk | hypothesis | `out/apartment`, 3 apartments, ac06ee6 | more apartments, completion-adjusted comparison, cause analysis |
-| C6 | Mixing techniques lowers the worst-case single-threat risk by 26-29 % (centre-fed) vs. 4-5 % (corner-fed) | supported for the defined game | `out/adversary.json`, ed84a34 | exact LP value, multi-threat game |
-| C7 | Crossing techniques lose validity under execution noise (21-38 % valid at 1x, M/L rooms) | supported (exploratory) | `out/robustness.json`, ed84a34 | breakdown by cause, correlated noise, CIs |
+| C5 | In apartments, limited penetration + dead-space step has the lowest risk | hypothesis | `out/apartment`, 3 apartments, d2214df | more apartments, completion-adjusted comparison, cause analysis |
+| C6 | Mixing techniques lowers the worst-case single-threat risk by 26-29 % (centre-fed) vs. 4-5 % (corner-fed) | supported for the defined game | `out/adversary.json`, fe35d94 | exact LP value, multi-threat game |
+| C7 | Crossing techniques lose validity under execution noise (21-38 % valid at 1x, M/L rooms) | supported (exploratory) | `out/robustness.json`, fe35d94 | breakdown by cause, correlated noise, CIs |
 | C8 | Trade-off between risk, predictability and robustness | hypothesis | C6 + C7 on different bases | common instances and assumptions |
-| C9 | A four-operator entry lowers `risk_multi` vs. two in M/L rooms | supported (exploratory) | `tactics.json` team-size rows, 9c7163a | prereg H4 on held-out rooms |
+| C9 | A four-operator entry lowers `risk_multi` vs. two in M/L rooms | supported (exploratory) | `tactics.json` team-size rows, deb8e15 | prereg H4 on held-out rooms |
 | C10 | Door watch lowers single-threat risk in apartments (12/12 pairs) | supported (exploratory) | ad-hoc run, see TACTICS.md | result file not archived |
-| C11 | Closed doors lower risk and add time (APT5: 0.965 -> 0.913, 46.8 -> 60.1 s) | supported (exploratory) | ad-hoc run, 3a7dfbd | more apartments, archived file |
+| C11 | Closed doors lower risk and add time (APT5: 0.965 -> 0.913, 46.8 -> 60.1 s) | supported (exploratory) | ad-hoc run, d5ce0ab | more apartments, archived file |
