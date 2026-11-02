@@ -18,7 +18,8 @@ results: [E0](docs/REPORT_E0.md) (exposure model) and
 - `bench.py` + `report.html`: results JSON and a self-contained report (Pareto plot +
   synchronized replays with uncleared threat positions)
 - `viewer3d.py` + `viewer3d.html`: three.js greybox viewer (prototype grid materials,
-  mannequins scaled to each operator's body, vision fans, ghost overlay of a second technique,
+  analysis capsules (exact simulated body + footprint) or a jointed test dummy for showcase
+  renders, both scaled to each operator, vision fans, ghost overlay of a second technique,
   oblique / top / follow camera, adjustable cutaway wall height). Needs WebGL and the jsDelivr CDN.
 
 ```
