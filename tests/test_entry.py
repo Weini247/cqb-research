@@ -1,0 +1,81 @@
+import json
+
+import numpy as np
+
+from killhouse.bench import main as bench_main
+from killhouse.doctrine import doctrines
+from killhouse.entry import OpPlan, Playbook, evaluate
+from killhouse.optimize import Archive, cem, decode, encode
+from killhouse.room import Room, los, standard_rooms
+from killhouse.team import default_team
+
+TEAM = default_team()
+ROOM = Room("t", 5.0, 5.0, 2.05, 2.95)
+
+
+def test_los_through_door_only():
+    q = np.array([[2.5, 2.0], [0.5, 0.5], [4.5, 0.5]])
+    v = los(ROOM, np.array([[2.5, -1.0]]), q)[0]
+    assert v.tolist() == [True, False, False]  # straight through yes, hidden corners no
+    assert los(ROOM, np.array([[2.5, 1.0]]), q).all()  # convex room: inside sees all
+
+
+def test_wall_thickness_blocks_oblique_view():
+    beside = np.array([[ROOM.door_x0 - 0.35, -0.5]])  # stacked next to the door frame
+    thin = Room("thin", 5.0, 5.0, 2.05, 2.95, wall_t=0.001)
+    thick_frac = los(ROOM, beside, ROOM.points()).mean()
+    assert thick_frac < 0.15
+    assert thick_frac < 0.8 * los(thin, beside, thin.points()).mean()
+
+
+def test_obstacle_blocks_los():
+    room = Room("box", 5.0, 5.0, 2.05, 2.95, ((2.0, 2.0, 3.0, 2.5),))
+    v = los(room, np.array([[2.5, 1.0]]), np.array([[2.5, 4.0], [0.5, 4.0]]))[0]
+    assert v.tolist() == [False, True]
+
+
+def test_doctrines_valid_on_empty_rooms():
+    for room in standard_rooms():
+        if room.obstacles:
+            continue
+        for pb in doctrines(room, TEAM):
+            res = evaluate(room, pb, TEAM)
+            assert res.collision < 0.02 and res.wall < 0.02, (room.name, pb.name)
+        assert any(evaluate(room, pb, TEAM).feasible for pb in doctrines(room, TEAM)), room.name
+
+
+def test_staying_outside_never_clears():
+    pb = Playbook(
+        "outside", [OpPlan(s, k, enter=False) for s, k in [(-1, 0), (1, 0), (-1, 1), (1, 1)]]
+    )
+    res = evaluate(ROOM, pb, TEAM)
+    assert not res.feasible and res.uncleared_end > 0.1
+
+
+def test_encode_decode_roundtrip():
+    pb = doctrines(ROOM, TEAM)[0]
+    pb2 = decode(encode(pb, ROOM, TEAM), ROOM, TEAM)
+    for a, b in zip(pb.ops, pb2.ops, strict=True):
+        assert np.allclose(a.pod, b.pod, atol=1e-6) and a.enter == b.enter
+
+
+def test_optimizer_not_worse_than_seed():
+    init = [encode(pb, ROOM, TEAM) for pb in doctrines(ROOM, TEAM)]
+    arch = Archive()
+    _, best = cem(ROOM, TEAM, 0.2, init, arch, iters=3, pop=8)
+    seed_scores = []
+    for x in init:
+        r = evaluate(ROOM, decode(x, ROOM, TEAM), TEAM)
+        seed_scores.append(
+            r.exposure + 0.2 * r.t_clear + 20 * (r.collision + r.wall) + 5 * r.fratricide
+        )
+    assert best <= min(seed_scores) + 1e-9
+    assert arch.front()
+
+
+def test_bench_quick(tmp_path):
+    bench_main(["--quick", "--rooms", "S-center", "--out", str(tmp_path)])
+    data = json.loads((tmp_path / "results.json").read_text(encoding="utf-8"))
+    room = data["rooms"][0]
+    assert len(room["doctrines"]) == 4 and room["front"]
+    assert "/*__DATA__*/null" not in (tmp_path / "report.html").read_text(encoding="utf-8")

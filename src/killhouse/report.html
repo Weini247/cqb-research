@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Killhouse E0 Report</title>
+<style>
+  :root { --bg:#14161a; --panel:#1c1f25; --line:#2c313a; --fg:#d8dce3; --muted:#8a919c; --accent:#f3a712; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui, sans-serif; }
+  .wrap { max-width:1280px; margin:0 auto; padding:16px; }
+  h1 { font-size:22px; margin:8px 0 4px; } h2 { font-size:16px; margin:24px 0 8px; }
+  .muted { color:var(--muted); } .small { font-size:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
+  th, td { padding:4px 8px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align:left; }
+  tbody tr { cursor:pointer; } tbody tr:hover { background:#252a32; }
+  .scroll { overflow-x:auto; }
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .tabs button, .ctl button { background:#2a2f38; color:var(--fg); border:1px solid var(--line);
+    border-radius:6px; padding:5px 10px; cursor:pointer; font:inherit; }
+  .tabs button.on { background:var(--accent); color:#111; border-color:var(--accent); }
+  .row { display:grid; grid-template-columns:minmax(280px, 420px) 1fr; gap:16px; }
+  @media (max-width:860px) { .row { grid-template-columns:1fr; } }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:10px; }
+  .panel canvas, #scatter { width:100%; height:auto; display:block; background:#101215; border-radius:6px; }
+  .panel b { font-size:13px; } .ctl { display:flex; gap:8px; align-items:center; margin:8px 0; }
+  .ctl input { flex:1; } .gap-pos { color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>How close are CQB room-entry techniques to the best found strategy?</h1>
+  <div class="muted">Killhouse E0, exploratory, not preregistered. Stylized doctrine models vs.
+    cross-entropy search in the same plan space. Exposure = seconds of whole-room line of sight
+    to still-uncleared threat positions, summed over operators.</div>
+  <div id="cfg" class="small muted"></div>
+
+  <h2>Summary</h2>
+  <div class="card scroll"><table id="sum"></table></div>
+
+  <h2>Room</h2>
+  <div class="tabs" id="tabs"></div>
+  <div class="row">
+    <div class="card">
+      <b>Exposure vs. time to clear</b>
+      <canvas id="scatter" width="840" height="640"></canvas>
+      <div class="small muted">grey: valid evaluations · line: Pareto front · colored: doctrines · ★ best found
+        (at equal-or-better time and fratricide vs. the best doctrine)</div>
+    </div>
+    <div class="card">
+      <div class="ctl"><button id="play">⏸</button><input id="seek" type="range" min="0" value="0">
+        <span id="tl" class="small muted"></span></div>
+      <div class="grid" id="panels"></div>
+      <div class="small muted">red: uncleared threat positions · green: cleared · cones: 100° vision ·
+        white tick: muzzle</div>
+    </div>
+  </div>
+  <p class="small muted">Limitations: no human factors, no active adversary, constant speeds, idealized perception
+    (dwell-based), doctrine encodings not yet SME-reviewed. "Best found" is a search result, not a proven optimum.</p>
+</div>
+<script>
+const D = /*__DATA__*/null;
+const COLORS = ["#4ea1ff", "#c678dd", "#56d364", "#ff9f43", "#f3a712"];
+const $ = id => document.getElementById(id);
+const c = D.config;
+$("cfg").textContent = `FOV ${c.half_fov_deg * 2}° · dwell ${c.dwell}s · turn ${c.turn_rate} rad/s · dt ${c.dt}s · `
+  + `horizon ${c.horizon}s · CEM ${c.iters}×${c.pop} × ${c.weights.length} weights · seed ${c.seed} · ${c.runtime_s}s runtime`;
+
+const pct = v => v == null ? "–" : (v * 100).toFixed(0) + "%";
+let rows = "<thead><tr><th>room</th><th>technique</th><th>E</th><th>T [s]</th><th>fratricide [s]</th>"
+  + "<th>E best found</th><th>gap E</th><th>gap T</th></tr></thead><tbody>";
+D.rooms.forEach((r, ri) => r.doctrines.forEach(d => {
+  rows += `<tr data-r="${ri}"><td>${r.room.name}</td><td>${d.name}</td>` + (d.feasible
+    ? `<td>${d.exposure.toFixed(3)}</td><td>${d.t_clear.toFixed(1)}</td><td>${d.fratricide.toFixed(1)}</td>`
+      + `<td>${d.exposure_best.toFixed(3)}</td><td class="${d.gap_exposure > 0.05 ? "gap-pos" : ""}">${pct(d.gap_exposure)}</td>`
+      + `<td>${pct(d.gap_time)}</td>`
+    : `<td colspan="6" class="muted">invalid: ${d.uncleared_end > 0.005 ? (d.uncleared_end * 100).toFixed(1) + "% never seen" : "collision/wall"}</td>`)
+    + "</tr>";
+}));
+$("sum").innerHTML = rows + "</tbody>";
+$("sum").onclick = e => { const tr = e.target.closest("tr[data-r]"); if (tr) select(+tr.dataset.r); };
+
+let cur = 0, k = 0, playing = true, acc = 0, last = performance.now();
+D.rooms.forEach((r, i) => {
+  const b = document.createElement("button"); b.textContent = r.room.name; b.onclick = () => select(i);
+  $("tabs").appendChild(b);
+});
+
+function scatter(r) {
+  const cv = $("scatter"), g = cv.getContext("2d"), W = cv.width, H = cv.height, m = 56;
+  g.clearRect(0, 0, W, H);
+  const pts = r.cloud.concat(r.front).concat(r.doctrines.filter(d => d.feasible).map(d => [d.exposure, d.t_clear]));
+  const best = r.replays.find(p => p.name.startsWith("best"));
+  if (best) pts.push([best.metrics.exposure, best.metrics.t_clear]);
+  if (!pts.length) return;
+  const xmax = Math.max(...pts.map(p => p[1])) * 1.08, ymax = Math.max(...pts.map(p => p[0])) * 1.1;
+  const X = t => m + t / xmax * (W - m - 16), Y = e => H - m - e / ymax * (H - m - 16);
+  g.strokeStyle = "#3a404a"; g.fillStyle = "#8a919c"; g.font = "22px system-ui"; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const t = xmax * i / 4, e = ymax * i / 4;
+    g.beginPath(); g.moveTo(X(t), Y(0)); g.lineTo(X(t), Y(ymax)); g.stroke();
+    g.beginPath(); g.moveTo(X(0), Y(e)); g.lineTo(X(xmax), Y(e)); g.stroke();
+    g.fillText(t.toFixed(1), X(t) - 14, H - m + 26); g.fillText(e.toFixed(2), 2, Y(e) + 7);
+  }
+  g.fillText("time to clear [s]", W / 2 - 80, H - 6);
+  g.fillStyle = "#5b6370"; r.cloud.forEach(p => { g.fillRect(X(p[1]) - 2, Y(p[0]) - 2, 4, 4); });
+  g.strokeStyle = "#d8dce3"; g.lineWidth = 2.5; g.beginPath();
+  r.front.forEach((p, i) => i ? g.lineTo(X(p[1]), Y(p[0])) : g.moveTo(X(p[1]), Y(p[0]))); g.stroke();
+  r.doctrines.forEach((d, i) => {
+    if (!d.feasible) return;
+    g.fillStyle = COLORS[i]; g.beginPath(); g.arc(X(d.t_clear), Y(d.exposure), 10, 0, 7); g.fill();
+    g.fillText(d.name, X(d.t_clear) + 14, Y(d.exposure) - 10 - i * 4);
+  });
+  if (best) {
+    const x = X(best.metrics.t_clear), y = Y(best.metrics.exposure);
+    g.fillStyle = COLORS[4]; g.font = "40px system-ui"; g.fillText("★", x - 15, y + 14);
+  }
+}
+
+let panels = [];
+function select(i) {
+  cur = i; k = 0; acc = 0; playing = true; $("play").textContent = "⏸";
+  [...$("tabs").children].forEach((b, j) => b.classList.toggle("on", j === i));
+  const r = D.rooms[i];
+  scatter(r);
+  $("panels").innerHTML = "";
+  panels = r.replays.map((rp, j) => {
+    const div = document.createElement("div"); div.className = "panel card";
+    const m = rp.metrics;
+    div.innerHTML = `<b style="color:${COLORS[Math.min(j, 4)]}">${rp.name}</b><canvas></canvas>`
+      + `<div class="small muted">E ${m.exposure.toFixed(3)} · T ${m.t_clear.toFixed(1)}s · fr ${m.fratricide.toFixed(1)}s`
+      + `${m.feasible ? "" : " · invalid"}</div>`;
+    $("panels").appendChild(div);
+    return { rp, cv: div.querySelector("canvas") };
+  });
+  $("seek").max = r.replays[0].pos.length - 1;
+}
+
+function drawPanel(r, p, k) {
+  const R = r.room, pad = 1.6, S = 40, cv = p.cv;
+  cv.width = (R.w + 2 * pad - 0.4) * S; cv.height = (R.d + pad + 1.0) * S;
+  const g = cv.getContext("2d");
+  const X = x => (x + pad - 0.2) * S, Y = y => (R.d + 0.4 - y) * S;
+  g.fillStyle = "#101215"; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = "#23272e"; g.fillRect(X(0), Y(R.d), R.w * S, R.d * S);
+  r.points.forEach(([x, y], i) => {
+    const alive = k < p.rp.first_seen[i];
+    g.fillStyle = alive ? "rgba(229,72,77,.85)" : "rgba(47,111,78,.55)";
+    g.fillRect(X(x) - 3, Y(y) - 3, 6, 6);
+  });
+  g.fillStyle = "#cfd3da";
+  R.obstacles.forEach(([x0, y0, x1, y1]) => g.fillRect(X(x0), Y(y1), (x1 - x0) * S, (y1 - y0) * S));
+  const t = 0.2, wall = (x0, y0, x1, y1) => g.fillRect(X(x0), Y(y1), (x1 - x0) * S, (y1 - y0) * S);
+  wall(-0.15, 0, 0, R.d + 0.15); wall(R.w, 0, R.w + 0.15, R.d + 0.15); wall(-0.15, R.d, R.w + 0.15, R.d + 0.15);
+  wall(-pad, -t, R.door[0], 0); wall(R.door[1], -t, R.w + pad, 0);
+  D.team.forEach((o, i) => {
+    const [x, y] = p.rp.pos[k][i], h = p.rp.gaze[k][i], cx = X(x), cy = Y(y), rad = o.radius_m * S;
+    g.fillStyle = o.color + "30"; g.beginPath(); g.moveTo(cx, cy);
+    g.arc(cx, cy, 2.2 * S, -h - 0.87, -h + 0.87); g.fill();
+    g.fillStyle = o.color; g.beginPath(); g.arc(cx, cy, rad, 0, 7); g.fill();
+    g.strokeStyle = "#fff"; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy);
+    g.lineTo(cx + Math.cos(-h) * rad * 1.8, cy + Math.sin(-h) * rad * 1.8); g.stroke();
+  });
+}
+
+function frame(now) {
+  const r = D.rooms[cur], n = r.replays[0].pos.length;
+  if (playing) {
+    acc += (now - last) / 1000;
+    while (acc >= D.config.dt * 1.5) { acc -= D.config.dt * 1.5; k = (k + 1) % n; }
+  }
+  last = now;
+  panels.forEach(p => drawPanel(r, p, k));
+  $("seek").value = k; $("tl").textContent = `t = ${(k * D.config.dt).toFixed(1)} s (0.67× speed)`;
+  requestAnimationFrame(frame);
+}
+$("play").onclick = () => { playing = !playing; $("play").textContent = playing ? "⏸" : "▶"; };
+$("seek").oninput = () => { k = +$("seek").value; playing = false; $("play").textContent = "▶"; };
+select(0); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

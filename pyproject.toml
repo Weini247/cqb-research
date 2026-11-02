@@ -3,10 +3,13 @@ name = "killhouse"
 version = "0.1.0"
 description = "CQB/Killhouse simulation prototype: procedural building, 4-operator team, replay viewer"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.4",
+]
 
 [project.scripts]
 killhouse = "killhouse.cli:main"
+killhouse-bench = "killhouse.bench:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
