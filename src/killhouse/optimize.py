@@ -116,6 +116,47 @@ class Archive:
         }
 
 
+def cem_minimize(
+    score_batch,
+    lo: np.ndarray,
+    hi: np.ndarray,
+    init: list[np.ndarray],
+    iters: int = 40,
+    pop: int = 40,
+    elite: int = 8,
+    seed: int = 0,
+    angle_cols: tuple[int, ...] = (),
+    explore: float = 0.2,
+) -> tuple[np.ndarray, float]:
+    """Cross-entropy method used by all optimizations (also by the reference cases in
+    `reference.py`). score_batch maps an (k, d) array to k scores (lower is better).
+
+    explore: share of every generation drawn uniformly from the bounds ("random immigrants").
+    Without it the sampling distribution can collapse onto a local optimum; the L-corridor
+    reference case failed in 2 of 5 seeds that way (see docs/REPORT_M2.md)."""
+    rng = np.random.default_rng(seed)
+    span = hi - lo
+    init = [np.asarray(x, float) for x in init]
+    scored = sorted(zip(score_batch(np.array(init)), init, strict=True), key=lambda s: s[0])
+    mean, std = scored[0][1].copy(), span * 0.25
+    best = scored[0]
+    for _ in range(iters):
+        xs = mean + std * rng.standard_normal((pop, len(mean)))
+        n_exp = int(round(explore * pop))
+        if n_exp:
+            xs[:n_exp] = rng.uniform(lo, hi, (n_exp, len(mean)))
+        for c in angle_cols:
+            xs[:, c] = (xs[:, c] + math.pi) % (2 * math.pi) - math.pi
+        xs = np.clip(xs, lo, hi)
+        gen = sorted(zip(score_batch(xs), xs, strict=True), key=lambda s: s[0])
+        if gen[0][0] < best[0]:
+            best = gen[0]
+        el = np.array([g[1] for g in gen[:elite]] + [best[1]])
+        mean = 0.7 * el.mean(0) + 0.3 * mean
+        std = np.maximum(0.7 * el.std(0) + 0.3 * std, span * 0.01)
+    return best[1], float(best[0])
+
+
 def cem(
     room: Room,
     team: list[Operator],
@@ -127,34 +168,16 @@ def cem(
     elite: int = 8,
     seed: int = 0,
 ) -> tuple[np.ndarray, float]:
-    rng = np.random.default_rng(seed)
     lo, hi = bounds(len(team))
-    span = hi - lo
-    scored = []
-    for x in init:
-        res = evaluate(room, decode(x, room, team), team)
-        archive.add(res, x)
-        scored.append((score(res, w), x))
-    scored.sort(key=lambda s: s[0])
-    mean, std = scored[0][1].copy(), span * 0.25
-    best = scored[0]
-    for _ in range(iters):
-        xs = mean + std * rng.standard_normal((pop, len(mean)))
-        for a in range(len(team)):
-            for j in ANGLES:
-                c = a * PER_OP + j
-                xs[:, c] = (xs[:, c] + math.pi) % (2 * math.pi) - math.pi
-        xs = np.clip(xs, lo, hi)
-        gen = []
+
+    def score_batch(xs: np.ndarray) -> list[float]:
+        out = []
         for x, res in zip(
             xs, evaluate_many(room, [decode(x, room, team) for x in xs], team), strict=True
         ):
             archive.add(res, x)
-            gen.append((score(res, w), x))
-        gen.sort(key=lambda s: s[0])
-        if gen[0][0] < best[0]:
-            best = gen[0]
-        el = np.array([g[1] for g in gen[:elite]] + [best[1]])
-        mean = 0.7 * el.mean(0) + 0.3 * mean
-        std = np.maximum(0.7 * el.std(0) + 0.3 * std, span * 0.01)
-    return best[1], best[0]
+            out.append(score(res, w))
+        return out
+
+    cols = tuple(a * PER_OP + j for a in range(len(team)) for j in ANGLES)
+    return cem_minimize(score_batch, lo, hi, init, iters, pop, elite, seed, cols)
