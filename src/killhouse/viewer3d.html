@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Killhouse 3D</title>
+<style>
+  :root { --panel:rgba(20,22,26,.86); --line:#2c313a; --fg:#e3e6eb; --muted:#9aa1ab; --accent:#f3a712; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#cfd8e3; color:var(--fg);
+    font:13px/1.4 system-ui, sans-serif; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .hud { position:fixed; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; backdrop-filter:blur(6px); }
+  #top { left:12px; top:12px; max-width:min(420px, calc(100% - 24px)); }
+  #bar { left:12px; right:12px; bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  #bar input[type=range]#seek { flex:1; min-width:140px; }
+  select, button { background:#2a2f38; color:var(--fg); border:1px solid var(--line); border-radius:6px;
+    padding:4px 8px; font:inherit; cursor:pointer; }
+  button.on { background:var(--accent); color:#111; border-color:var(--accent); }
+  .muted { color:var(--muted); } .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:6px; }
+  .op { display:inline-flex; align-items:center; gap:4px; margin-right:8px; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  b.big { font-size:15px; }
+  #err { position:fixed; inset:0; display:none; place-items:center; color:#222; font-size:15px; }
+  @media (max-width:640px) { #top { font-size:12px; } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="err">3D-Ansicht braucht WebGL und Internet (three.js vom CDN).</div>
+<div class="hud" id="top">
+  <b class="big">Killhouse · Raumeintritt</b>
+  <div class="row">
+    <select id="room" aria-label="Raum"></select>
+    <select id="tech" aria-label="Technik"></select>
+    <select id="ghost" aria-label="Vergleich"></select>
+  </div>
+  <div id="metrics" class="row muted"></div>
+  <div id="team" class="row"></div>
+  <div class="row muted">rot = ungesicherte Bedrohungsposition · grün = gesichert · Fächer = Blickkegel</div>
+</div>
+<div class="hud" id="bar">
+  <button id="play">⏸</button>
+  <select id="speed" aria-label="Tempo"><option value="0.25">0,25×</option><option value="0.5" selected>0,5×</option><option value="1">1×</option></select>
+  <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Zeit">
+  <span id="time" class="muted" style="min-width:64px"></span>
+  <span class="muted">Wände</span><input id="wallh" type="range" min="0.3" max="2.6" step="0.1" value="1.2" aria-label="Wandhöhe" style="width:90px">
+  <button id="cam-oblique" class="on">Schräg</button><button id="cam-top">Draufsicht</button><button id="cam-follow">Folgen</button>
+  <button id="fov" class="on">Blickkegel</button>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const D = /*__DATA__*/null;
+const $ = id => document.getElementById(id);
+const DT = D.config.dt, HALF_FOV = D.config.half_fov_deg * Math.PI / 180;
+
+// ---------- renderer / scene ----------
+const canvas = $("c");
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); }
+catch (e) { $("err").style.display = "grid"; throw e; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+{ // sky gradient
+  const c = document.createElement("canvas"); c.width = 2; c.height = 256;
+  const g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, "#5f8fc9"); gr.addColorStop(0.55, "#b9cde3"); gr.addColorStop(1, "#eef1f4");
+  g.fillStyle = gr; g.fillRect(0, 0, 2, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; scene.background = t;
+}
+scene.fog = new THREE.Fog(0xdfe5ec, 30, 80);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.49;
+
+scene.add(new THREE.HemisphereLight(0xdfe9f5, 0x6b6f75, 0.9));
+const sun = new THREE.DirectionalLight(0xfff4e5, 2.4);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.02;
+Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 1, far: 60 });
+scene.add(sun, sun.target);
+
+// ---------- prototype grid materials ----------
+function gridCanvas(base, minor, major) {
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const g = c.getContext("2d");
+  g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = minor; g.lineWidth = 2;
+  for (let i = 32; i < 256; i += 32) {
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke();
+    g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke();
+  }
+  g.strokeStyle = major; g.lineWidth = 6; g.strokeRect(0, 0, 256, 256);
+  return c;
+}
+const CANVASES = {
+  floor: gridCanvas("#80858b", "#737880", "#e7e9ec"),
+  wall: gridCanvas("#e6e6e3", "#cfcfcb", "#a4a4a0"),
+  crate: gridCanvas("#e39a32", "#d18a28", "#a8681a"),
+};
+function gridMat(kind, sx, sy, extra = {}) {
+  const t = new THREE.CanvasTexture(CANVASES[kind]);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(sx, sy);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, metalness: 0, ...extra });
+}
+
+// room frame (x right, y into room) -> three (x, up, z = -y)
+function box(x0, y0, x1, y1, z0, z1, kind) {
+  const sx = x1 - x0, sy = y1 - y0, sz = z1 - z0;
+  const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sz, sy), gridMat(kind, Math.max(sx, sy), sz));
+  m.position.set((x0 + x1) / 2, (z0 + z1) / 2, -(y0 + y1) / 2);
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+
+// ---------- mannequins ----------
+const SKIN = 0xf2a23a;
+function mannequin(op, ghost) {
+  const h = op.height_m, w = Math.max(0.34, op.radius_m * 1.7);
+  const mat = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.55,
+    transparent: ghost, opacity: ghost ? 0.33 : 1, depthWrite: !ghost });
+  const accent = new THREE.MeshStandardMaterial({ color: op.color, roughness: 0.5,
+    transparent: ghost, opacity: ghost ? 0.33 : 1, depthWrite: !ghost });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e33, roughness: 0.6,
+    transparent: ghost, opacity: ghost ? 0.33 : 1 });
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const legL = 0.47 * h, torso = 0.3 * h, head = 0.065 * h;
+  const add = (geo, m, x, y, z, parent = body) => {
+    const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z);
+    mesh.castShadow = !ghost; parent.add(mesh); return mesh;
+  };
+  const legs = [-1, 1].map(s => {
+    const hip = new THREE.Group(); hip.position.set(0, legL, s * w * 0.22); body.add(hip);
+    add(new THREE.BoxGeometry(0.15, legL, 0.14), mat, 0, -legL / 2, 0, hip);
+    add(new THREE.BoxGeometry(0.24, 0.07, 0.13), mat, 0.05, -legL + 0.035, 0, hip);
+    return hip;
+  });
+  add(new THREE.BoxGeometry(0.24, 0.12, w * 0.8), mat, 0, legL + 0.03, 0);                  // pelvis
+  add(new THREE.BoxGeometry(0.26, torso, w), mat, 0.01, legL + torso / 2 + 0.05, 0);          // torso
+  add(new THREE.BoxGeometry(0.29, torso * 0.55, w * 0.92), accent, 0.02, legL + torso * 0.62, 0); // vest
+  add(new THREE.SphereGeometry(head, 16, 12), mat, 0.02, legL + torso + 0.05 + head * 1.2, 0);
+  add(new THREE.SphereGeometry(head * 1.12, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), accent,
+    0.02, legL + torso + 0.05 + head * 1.35, 0);                                             // helmet
+  const sh = legL + torso - 0.02;
+  [-1, 1].forEach(s => {
+    const arm = add(new THREE.BoxGeometry(0.42, 0.09, 0.09), mat, 0.2, sh - 0.12, s * w * 0.35);
+    arm.rotation.y = -s * 0.5;
+  });
+  add(new THREE.BoxGeometry(0.75, 0.06, 0.05), dark, 0.38, sh - 0.08, 0);                     // rifle
+  const fan = new THREE.Mesh(
+    new THREE.CircleGeometry(2.4, 40, -HALF_FOV, 2 * HALF_FOV).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: op.color, transparent: true, opacity: ghost ? 0.08 : 0.2,
+      depthWrite: false }));
+  fan.position.y = 0.02; fan.renderOrder = 2; g.add(fan);
+  return { g, body, legs, fan, phase: 0, last: null };
+}
+
+// ---------- world state ----------
+let world = new THREE.Group(); scene.add(world);
+let wallGroup = new THREE.Group();
+let team = [], ghostTeam = [], dots = null, room = null, rep = null, ghostRep = null;
+let t = 0, playing = true, camMode = "oblique", showFov = true;
+const RED = new THREE.Color(0xe5484d), GREEN = new THREE.Color(0x5f9c78);
+
+function buildWalls() {
+  world.remove(wallGroup); wallGroup = new THREE.Group(); world.add(wallGroup);
+  const R = room.room, H = +$("wallh").value, w = R.w, d = R.d, [dx0, dx1] = R.door;
+  const T = 0.2, ext = 2.6, back = -2.8;
+  const add = (...a) => wallGroup.add(box(...a));
+  add(-T, 0, 0, d + T, 0, H, "wall");
+  add(w, 0, w + T, d + T, 0, H, "wall");
+  add(-T, d, w + T, d + T, 0, H, "wall");
+  add(-ext, -T, dx0, 0, 0, H, "wall");
+  add(dx1, -T, w + ext, 0, 0, H, "wall");
+  if (H > 2.1) add(dx0, -T, dx1, 0, 2.1, H, "wall");
+  add(-ext, back - T, w + ext, back, 0, Math.min(H, 1.0), "wall");
+}
+
+function loadRoom(i) {
+  scene.remove(world); world = new THREE.Group(); scene.add(world);
+  room = D.rooms[i];
+  const R = room.room, w = R.w, d = R.d;
+  const fx0 = -6, fx1 = w + 6, fy0 = -7, fy1 = d + 4;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(fx1 - fx0, fy1 - fy0).rotateX(-Math.PI / 2),
+    gridMat("floor", fx1 - fx0, fy1 - fy0));
+  floor.position.set((fx0 + fx1) / 2, 0, -(fy0 + fy1) / 2); floor.receiveShadow = true; world.add(floor);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xbfc5cc, roughness: 1 }));
+  ground.position.y = -0.01; ground.receiveShadow = true; world.add(ground);
+  buildWalls();
+  R.obstacles.forEach(([x0, y0, x1, y1]) => world.add(box(x0, y0, x1, y1, 0, 1.15, "crate")));
+  // door marker arrow on the hallway floor, like a training-facility floor marking
+  const arrow = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([
+    new THREE.Vector2(0, 0.35), new THREE.Vector2(0.3, 0), new THREE.Vector2(0.1, 0),
+    new THREE.Vector2(0.1, -0.35), new THREE.Vector2(-0.1, -0.35), new THREE.Vector2(-0.1, 0),
+    new THREE.Vector2(-0.3, 0)])).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0xf5f6f7 }));
+  arrow.position.set((R.door[0] + R.door[1]) / 2, 0.012, 1.7); world.add(arrow);
+
+  const pts = room.points;
+  dots = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.045, 0.045, 0.02, 8),
+    new THREE.MeshBasicMaterial(), pts.length);
+  const m4 = new THREE.Matrix4();
+  pts.forEach(([x, y], k) => { m4.makeTranslation(x, 0.015, -y); dots.setMatrixAt(k, m4); dots.setColorAt(k, RED); });
+  world.add(dots);
+
+  sun.position.set(w / 2 - 7, 14, -d / 2 + 9); sun.target.position.set(w / 2, 0, -d / 2);
+  $("tech").innerHTML = room.replays.map((r, k) => `<option value="${k}">${r.name}</option>`).join("");
+  $("ghost").innerHTML = `<option value="-1">kein Vergleich</option>`
+    + room.replays.map((r, k) => `<option value="${k}">Geist: ${r.name}</option>`).join("");
+  const kn = room.replays.findIndex(r => r.name.startsWith("best"));
+  $("ghost").value = kn >= 0 ? kn : -1;
+  loadTech(0); setCam(camMode, true);
+}
+
+function spawn(list, ghost) {
+  list.forEach(m => world.remove(m.g));
+  const out = D.team.map(op => mannequin(op, ghost));
+  out.forEach(m => { m.fan.visible = showFov; world.add(m.g); });
+  return out;
+}
+
+function loadTech(k) {
+  rep = room.replays[k];
+  team = spawn(team, false);
+  const gk = +$("ghost").value;
+  ghostRep = gk >= 0 && gk !== k ? room.replays[gk] : null;
+  ghostTeam = spawn(ghostTeam, true);
+  ghostTeam.forEach(m => { m.g.visible = !!ghostRep; });
+  const m = rep.metrics;
+  $("metrics").innerHTML = `Risiko <b>${m.risk.toFixed(3)}</b> · gesichert nach <b>${m.t_clear.toFixed(1)} s</b>`
+    + ` · Fratricide ${m.fratricide.toFixed(1)} s${m.feasible ? "" : " · <span style='color:#ff8a80'>ungültig</span>"}`
+    + (ghostRep ? ` · Geist: ${ghostRep.name} (R ${ghostRep.metrics.risk.toFixed(3)})` : "");
+  t = 0;
+}
+
+$("team").innerHTML = D.team.map(o => `<span class="op"><span class="dot" style="background:${o.color}"></span>`
+  + `${o.name} <span class="muted">${o.height_m} m · r ${o.radius_m} m</span></span>`).join("");
+$("room").innerHTML = D.rooms.map((r, i) => `<option value="${i}">${r.room.name}</option>`).join("");
+
+// ---------- animation ----------
+const lerpAng = (a, b, f) => a + (((b - a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI) * f;
+function pose(list, r, time, dt) {
+  const n = r.pos.length, ft = Math.max(0, Math.min(time / DT, n - 1.001));
+  const k = Math.floor(ft), f = ft - k;
+  list.forEach((m, i) => {
+    const a = r.pos[k][i], b = r.pos[k + 1][i];
+    const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f;
+    const g = lerpAng(r.gaze[k][i], r.gaze[k + 1][i], f);
+    m.g.position.set(x, 0, -y); m.g.rotation.y = g;
+    const speed = Math.hypot(b[0] - a[0], b[1] - a[1]) / DT;
+    m.phase += speed * dt * 5.5;
+    const amp = Math.min(1, speed / 1.6) * 0.55;
+    m.legs[0].rotation.z = Math.sin(m.phase) * amp;
+    m.legs[1].rotation.z = -Math.sin(m.phase) * amp;
+    m.body.position.y = Math.abs(Math.sin(m.phase)) * 0.03 * amp;
+  });
+  return k;
+}
+
+function setCam(mode, snap) {
+  camMode = mode;
+  ["oblique", "top", "follow"].forEach(c => $("cam-" + c).classList.toggle("on", c === mode));
+  const R = room.room, cx = R.w / 2, cz = -R.d / 2 + 0.8;
+  const span = (Math.max(R.w, R.d) + 3) / Math.min(1, camera.aspect * 1.25);
+  if (mode === "top") { camera.position.set(cx, span * 1.55, cz + 0.01); controls.target.set(cx, 0, cz); }
+  else if (mode === "oblique" || snap) {
+    camera.position.set(cx - span * 0.35, span * 0.95, cz + span * 1.05); controls.target.set(cx, 0, cz - 0.4);
+  }
+  controls.update();
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+  const dur = (rep.pos.length - 1) * DT;
+  if (playing) { t += dt * +$("speed").value; if (t > dur + 1.0) t = 0; }
+  const tc = Math.min(t, dur);
+  const k = pose(team, rep, tc, playing ? dt : 0);
+  if (ghostRep) pose(ghostTeam, ghostRep, tc, playing ? dt : 0);
+  rep.first_seen.forEach((fs, j) => dots.setColorAt(j, k < fs ? RED : GREEN));
+  dots.instanceColor.needsUpdate = true;
+  if (camMode === "follow") {
+    const c = new THREE.Vector3(); team.forEach(m => c.add(m.g.position)); c.multiplyScalar(1 / team.length);
+    const delta = c.clone().sub(controls.target).multiplyScalar(0.06);
+    controls.target.add(delta); camera.position.add(delta);
+  }
+  controls.update();
+  $("seek").value = Math.round(tc / dur * 1000);
+  $("time").textContent = `t = ${tc.toFixed(1)} s`;
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+
+$("room").onchange = e => loadRoom(+e.target.value);
+$("tech").onchange = e => loadTech(+e.target.value);
+$("ghost").onchange = () => loadTech(+$("tech").value);
+$("play").onclick = () => { playing = !playing; $("play").textContent = playing ? "⏸" : "▶"; };
+$("seek").oninput = e => { t = +e.target.value / 1000 * (rep.pos.length - 1) * DT; playing = false; $("play").textContent = "▶"; };
+$("wallh").oninput = buildWalls;
+["oblique", "top", "follow"].forEach(c => $("cam-" + c).onclick = () => setCam(c, c === "follow"));
+$("fov").onclick = () => { showFov = !showFov; $("fov").classList.toggle("on", showFov);
+  team.concat(ghostTeam).forEach(m => { m.fan.visible = showFov; }); };
+
+resize();
+const start = Math.max(0, D.rooms.findIndex(r => r.room.name === "L-corner"));
+$("room").value = start; loadRoom(start);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

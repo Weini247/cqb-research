@@ -19,6 +19,7 @@ from .entry import Playbook, Result, evaluate
 from .optimize import Archive, cem, decode, encode
 from .room import Room, standard_rooms
 from .team import default_team
+from .viewer3d import to_html as viewer3d_html
 
 WEIGHTS = (0.01, 0.03, 0.1, 0.3)
 
@@ -133,6 +134,7 @@ def main(argv: list[str] | None = None) -> None:
     tpl = resources.files("killhouse").joinpath("report.html").read_text(encoding="utf-8")
     payload = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     (a.out / "report.html").write_text(tpl.replace("/*__DATA__*/null", payload), encoding="utf-8")
+    (a.out / "viewer3d.html").write_text(viewer3d_html(data), encoding="utf-8")
     print(f"\n{'room':14s} {'doctrine':20s} {'R':>6s} {'T':>5s} {'fr':>4s} {'R*':>6s} {'gapR':>5s}")
     for r in results:
         for d in r["doctrines"]:

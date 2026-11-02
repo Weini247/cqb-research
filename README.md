@@ -17,11 +17,15 @@ results: [E0](docs/REPORT_E0.md) (exposure model) and
 - `sensitivity.py`: one-at-a-time robustness of the doctrine ranking (8 model/geometry axes)
 - `bench.py` + `report.html`: results JSON and a self-contained report (Pareto plot +
   synchronized replays with uncleared threat positions)
+- `viewer3d.py` + `viewer3d.html`: three.js greybox viewer (prototype grid materials,
+  mannequins scaled to each operator's body, vision fans, ghost overlay of a second technique,
+  oblique / top / follow camera, adjustable cutaway wall height). Needs WebGL and the jsDelivr CDN.
 
 ```
 python -m uv sync
 python -m uv run killhouse-bench --out out/bench-e1      # ~18 min, single core
 python -m uv run killhouse-sens                          # ~15 s
+python -m uv run killhouse-3d out/bench-e1/results.json  # -> out/bench-e1/viewer3d.html
 python -m uv run killhouse-bench --quick --rooms M-center  # smoke run
 ```
 

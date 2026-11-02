@@ -78,6 +78,9 @@ def test_bench_quick(tmp_path):
     room = data["rooms"][0]
     assert len(room["doctrines"]) == 4 and room["front"]
     assert "/*__DATA__*/null" not in (tmp_path / "report.html").read_text(encoding="utf-8")
+    html3d = (tmp_path / "viewer3d.html").read_text(encoding="utf-8")
+    assert "/*__DATA__*/null" not in html3d and "three@0.160.0" in html3d
+    assert '"cloud"' not in html3d  # viewer payload is stripped to what it renders
 
 
 def test_threat_model_rewards_more_guns_and_faster_engagement():
