@@ -48,10 +48,14 @@ the size of the gap?
 
 For each confirmatory room: evaluate the four playbooks; run CEM (budget to be fixed after the
 fast simulator, at least 30 iterations x 32 samples x 4 weights, seeded with the playbooks;
-precondition: search saturation, i.e. the front changes < 2 % over the last 25 % of iterations) with optimizer seeds 0, 1, 2; build the archive per
-seed. Gap per technique and room = relative reduction of `risk_multi` at equal-or-better
-`t_clear` and fratricide (`gap_risk`), computed on held-out threat scenarios after the front
-has been selected on planning scenarios. The reported gap is the median over the 3 seeds.
+precondition: search saturation, i.e. the front changes < 2 % over the last 25 % of iterations) with optimizer seeds 0-4; build the archive per
+seed. **Scope of E1: single rooms only** (apartments are a separate later study). Gap per technique and room = relative reduction of `risk_multi` at equal-or-better
+`t_clear` and fratricide (`gap_risk`), computed on held-out threat scenarios for **one candidate per technique that was selected on
+planning scenarios** (lowest planning risk at equal-or-better time and fratricide). The
+optimistic best-of-front value is reported only as secondary. **Aggregation:** per room and
+technique, the median over the 5 optimizer seeds; tests then use rooms as the unit (no
+further averaging). Because two seeds differed by up to 20 points in the development rooms,
+the confirmatory run uses **5 seeds** and reports the spread across seeds as well.
 
 ## 5. Hypotheses and decision rules
 
@@ -64,7 +68,7 @@ has been selected on planning scenarios. The reported gap is the median over the
 
 **Multiple testing:** H1, H2 and H4 form one family and are Holm-corrected at alpha = 0.05.
 H3 is a descriptive robustness criterion without a p-value. Rooms are the independent unit
-in every test, and seeds are averaged within a room first.
+in every test, and seeds are aggregated within a room first (median, see §4).
 
 All four hypotheses are reported regardless of outcome. Exploratory analyses (for example,
 descriptions of the best found strategies) are labelled as such.
@@ -90,6 +94,8 @@ scope, stylized playbooks.
   room generator).
 - 2026-11-02: pilot (REPORT_E1_pilot.md) showed an under-budgeted search in large rooms; the
   confirmatory budget is now tied to a saturation check.
+- 2026-11-02: review R3 (REVIEW_R3.md): E1 limited to single rooms, single pre-selected
+  candidate per technique, 5 optimizer seeds, consistent aggregation (median over seeds).
 - 2026-11-02: review R2 (REVIEW_R2.md): H4 on room level, Holm correction, explicit test family.
 - 2026-11-02: methodological review R1 (REVIEW_R1.md): added scope/validity section,
   information model, separation of planning and held-out threat scenarios, parameter

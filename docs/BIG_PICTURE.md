@@ -39,19 +39,29 @@ preprint(s), later possibly a thesis.
 
 ## Main findings so far (all exploratory, model-internal)
 
-1. **Ranking among the stylized techniques is very robust across 20 sensitivity variants.**
-   Pie + crisscross < crisscross < buttonhook in 164/165 cases. Limited penetration is
-   mostly worse.
-2. **Optimizer gaps exist mainly for corner-fed doors and small rooms** (14-53 %). For
-   centre-fed doors they shrank to 0 % on held-out threat scenarios; R1 uncovered this
-   overfitting.
-3. **Apartments reverse the ranking:** limited penetration with the dead-space step is best
-   there. Probable reason: uncleared rooms look into the hallway.
-4. **Price of predictability:** mixing techniques lowers the worst-case risk by 26-29 % for
-   centre-fed doors, by 4-5 % for corner-fed doors.
-5. **Risk is robust, execution is not:** under execution noise only 21-38 % of crossing
-   techniques stay free of body contact, against 62-96 % for the single-side combination.
-6. **Trade-off:** low risk, unpredictability and robust execution pull in different directions.
+1. **Pairwise comparisons are stable in one-at-a-time sensitivity (20 variants):**
+   crisscross < buttonhook in 164/165 cases, pie + crisscross < crisscross in 164/164,
+   crisscross < limited penetration in 150/168. The denominators differ (invalid cases are
+   excluded), so this is not a single total ranking, and interactions between axes are untested.
+2. **Optimizer gaps are low-reliability (revised after R3).** With one candidate selected
+   per doctrine and scored on held-out scenarios, gaps are 1-54 % at the full budget, but two
+   optimizer seeds differ by up to 20 points (M-center crisscross 20 % vs. 0 %). The earlier
+   "0 % for centre-fed doors" came from too small a budget. Gaps are lower bounds on attainable
+   improvement in the model, not stable effect sizes.
+3. **Apartments may reverse the ranking (low reliability):** limited penetration with the
+   dead-space step had the lowest risk in 3 development apartments. In APT1 it did not fully
+   clear one room, the comparison population is small, and the hallway explanation is not
+   causally identified.
+4. **Price of predictability (defined finite game):** the best mixture lowers the
+   worst-case single-threat risk by 26-29 % for centre-fed doors and by 4-5 % for corner-fed
+   doors. "Mixing is never worse" holds by construction (mixtures include pure techniques);
+   the effect size is the finding. The adversary knows the mixture, not the draw, and the 5 %
+   grid gives an upper bound on the exact game value.
+5. **Risk changes little under execution noise, validity a lot:** crossing techniques stay
+   valid in 21-38 % of executions in M/L rooms at 1x noise, the single-side combination in
+   62-96 %. "Valid" combines contact, wall and clearance criteria.
+6. **Trade-off (hypothesis only):** low risk, unpredictability and robust execution seem to
+   pull in different directions; not yet shown on a common data basis.
 
 ## Known weaknesses
 

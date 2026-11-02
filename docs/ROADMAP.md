@@ -19,6 +19,17 @@ Stand: 2026-11-02. Status pro Etappe: ✅ fertig · 🔄 läuft · ⏳ offen.
 - **Jede Entdeckung muss vier Prüfungen bestehen:** neue Grundrisse, Sensitivität,
   adaptiver Gegner, Ausbilder.
 
+## Nächste Meilensteine (nach Review R3)
+
+| Meilenstein | Inhalt | Abnahme |
+|---|---|---|
+| **M1** belastbarer Stand | Aussagenregister ([CLAIMS.md](CLAIMS.md)), Quellenmatrix, konsistente Doku, Provenienz | jede Hauptaussage mit Datenbeleg oder als Hypothese markiert ✅ (bis auf Quellenmatrix) |
+| **M2** Methodenprüfung | domänenneutrale Referenzfälle mit bekannter Lösung (Sichtabdeckung, Watchman-Route), Prüfung der Bestwert-Auswahl, Seed-Streuung | bekannte Referenzwerte reproduziert, Analyseplan eingefroren |
+| **M3** Studie und Release | eine eng begrenzte, reproduzierbare Studie, öffentliches Release | eine andere Person reproduziert Haupttabelle und Grafik |
+
+Strategische Empfehlungen aus R3 (Forschungsfrage methodisch fassen, Etappe 9 zurückstellen,
+neutraler Repo-Name) stehen zur Entscheidung an.
+
 ## Etappen
 
 ### 1 · Einzelraum-Studie abschließen ✅

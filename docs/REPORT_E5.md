@@ -38,8 +38,10 @@ dominates.
 ## B. Robustness to execution noise
 
 Noise levels 0 / 0.5 / 1 / 2 x base (base: start time 0.25 s, positions 0.25 m, gaze
-0.15 rad, speed 10 %), 24 executions per cell. Shown: mean `risk_multi` / share of valid
-executions (no body contact, no wall contact, room cleared).
+0.15 rad, speed 10 %), 24 executions per cell. Shown: mean `risk_multi` over **all**
+executions / share of **valid** executions. "Valid" combines three criteria (body contact
+< 0.02 m·s, wall contact < 0.02 m·s, room cleared), so it does not mean "contact-free"
+alone. A breakdown by cause is still open.
 
 | room | crisscross | buttonhook | comb. cross | two-man | limited | pie+cross | deliberate |
 |---|---|---|---|---|---|---|---|
@@ -49,18 +51,22 @@ executions (no body contact, no wall contact, room cleared).
 All rooms are in `out/robustness.json`.
 
 **Findings:**
-1. **Risk is robust, execution is not.** The mean risk changes by at most ±0.04 up to twice
-   the base noise. Physical validity, however, collapses for techniques in which two
-   operators cross in the doorway: crisscross and pie + crisscross fall to 21-38 % valid
+1. **The risk changes little, execution validity a lot.** Mean risk over all executions
+   changes by a median of 0.02 and at most 0.09 (M-corner buttonhook, 2x noise) against the
+   noise-free run. (Corrected after review R3: an earlier version claimed "at most ±0.04",
+   which the table itself contradicts, e.g. combination cross M-center 0.82 -> 0.76.)
+   Validity, however, collapses for techniques in which two operators cross in the doorway: crisscross and pie + crisscross fall to 21-38 % valid
    executions at 1x noise in M/L rooms.
 2. **The single-side combination is the robust alternative in corner-fed rooms.** Its risk is
    almost that of crisscross (L-corner 0.59 vs 0.58), but it is 2-3 times more often
    collision-free at 1x noise (0.88 vs 0.38).
 3. **Fewer people in the doorway means more robustness:** the two-man entry stays at 62-75 %
    valid across all noise levels; deliberate entry and limited penetration are also robust.
-4. **Combined with A:** Low risk (crisscross), low predictability (mixing) and robust
-   execution (combination / deliberate) pull in different directions. That is a trade-off
-   worth reporting, and a target for the search for new techniques (stage 9).
+4. **Hypothesis, not a demonstrated trade-off (review R3):** low risk (crisscross),
+   low predictability (mixing) and robust execution (combination / deliberate) seem to pull in
+   different directions. But A uses one threat and B two, and the technique sets differ. A
+   trade-off claim needs all three dimensions on the same instances, techniques and
+   assumptions.
 
 ## Limitations
 

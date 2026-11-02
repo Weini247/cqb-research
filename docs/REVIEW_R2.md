@@ -34,4 +34,6 @@ implementation and the optimization results are not proven by the package.
 | Apartment report said "2 threats each" | Corrected: 2 threats per scenario over the whole apartment | ✅ |
 
 **Assessment:** R2 found no new modelling error like the information leak in R1, but six
-real inconsistencies in documentation and analysis plan. All of them are fixed.
+real inconsistencies in documentation and analysis plan. They were addressed. Review R3 then
+found that remaining inconsistencies and a further selection bias still existed, so
+"all fixed" was too strong (see REVIEW_R3.md).

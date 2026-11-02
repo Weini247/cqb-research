@@ -104,6 +104,8 @@ def test_kendall_and_variants():
 
 
 def test_multi_threat_values_full_team():
+    """Regression test: protects the implemented multi-threat engagement rule. It is NOT
+    evidence for prereg H4 (review R3: a test that fixes an outcome cannot confirm it)."""
     room = standard_rooms()[2]  # M-center
     pb = doctrines(room, TEAM)[0]
     two = Playbook("2", [dataclasses.replace(o, enter=i < 2) for i, o in enumerate(pb.ops)])
