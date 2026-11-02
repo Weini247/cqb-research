@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .doctrine import doctrines
 from .entry import DEFAULT_CFG, ModelCfg, evaluate
+from .optimize import OBJECTIVE
 from .room import Room, standard_rooms
 from .team import Operator, default_team
 
@@ -53,7 +54,7 @@ def ranking(cfg: ModelCfg, rooms: list[Room], team: list[Operator]) -> dict[str,
         rows = {}
         for pb in doctrines(room, team):
             res = evaluate(room, pb, team, cfg=cfg)
-            rows[pb.name] = res.risk if res.feasible else math.inf
+            rows[pb.name] = res.objective(OBJECTIVE) if res.feasible else math.inf
         out[room.name] = rows
     return out
 

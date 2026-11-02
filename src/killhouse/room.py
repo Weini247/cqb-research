@@ -114,6 +114,15 @@ def generated_rooms(seed: int, n: int) -> list[Room]:
     return out
 
 
+def rooms_digest(rooms: list[Room]) -> str:
+    """SHA-256 over the room definitions, recorded in the preregistration."""
+    import hashlib
+    import json
+
+    blob = json.dumps([r.to_dict() for r in rooms], sort_keys=True).encode()
+    return hashlib.sha256(blob).hexdigest()
+
+
 def standard_rooms() -> list[Room]:
     """E0 geometry set: 3 sizes x centre/corner-fed door, plus two rooms with furniture."""
     rooms = []
