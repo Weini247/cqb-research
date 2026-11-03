@@ -17,6 +17,7 @@ evaluated; only their hash was computed.
 | fe35d94 | adversary, robustness | stage-5 findings | — |
 | (R2 commit) | review R2: source status, valid-only stats, prereg tests | — | — |
 | ee64dc1 / b1ca549 | M2: reference cases, CEM with random immigrants | saturation study on M-center, M-corner, L-center (5 seeds x 4 budgets) | prereg budget 60x64x4, pooled archives, saturation across seeds |
+| b5072b8 / (M2c commit) | pooled estimator, CMA-ES | pooled CEM and CMA-ES on M-center, M-corner, L-center (5 seeds each) | second optimizer family in the prereg, method agreement within 5 points replaces the 2 % seed rule |
 
 **Rule from now on:** every report names its commit and its configuration (`config` in
 `results.json`). Changes to the model after the prereg freeze go only into a new, separately

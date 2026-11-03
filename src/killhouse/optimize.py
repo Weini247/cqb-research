@@ -157,6 +157,81 @@ def cem_minimize(
     return best[1], float(best[0])
 
 
+def cmaes_minimize(
+    score_batch,
+    lo: np.ndarray,
+    hi: np.ndarray,
+    init: list[np.ndarray],
+    iters: int = 40,
+    pop: int = 40,
+    seed: int = 0,
+    angle_cols: tuple[int, ...] = (),
+    sigma0: float = 0.25,
+) -> tuple[np.ndarray, float]:
+    """CMA-ES (Hansen's standard parameters, full covariance) as a second optimizer family for
+    the cross-check in docs/REPORT_M2.md. Same interface and evaluation budget as
+    `cem_minimize`. Works in coordinates normalized to [0, 1]; samples outside the bounds are
+    clipped for evaluation and penalized by their squared distance, angles wrap."""
+    rng = np.random.default_rng(seed)
+    span = hi - lo
+    n, lam = len(lo), pop
+    ang = np.zeros(n, bool)
+    ang[list(angle_cols)] = True
+
+    def repair(z: np.ndarray) -> np.ndarray:
+        z = z.copy()
+        z[:, ang] %= 1.0
+        return np.clip(z, 0.0, 1.0)
+
+    def evaluate_z(z: np.ndarray) -> np.ndarray:
+        zr = repair(z)
+        f = np.asarray(score_batch(lo + zr * span), float)
+        return f + ((z - zr)[:, ~ang] ** 2).sum(1)  # wrapped angles are not out of bounds
+
+    z0 = np.array([(np.asarray(x, float) - lo) / span for x in init])
+    f0 = evaluate_z(z0)
+    best_z, best_f = z0[int(np.argmin(f0))].copy(), float(f0.min())
+    m, sigma = best_z.copy(), sigma0
+    mu = lam // 2
+    wts = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+    wts /= wts.sum()
+    mueff = 1.0 / (wts**2).sum()
+    cc = (4 + mueff / n) / (n + 4 + 2 * mueff / n)
+    cs = (mueff + 2) / (n + mueff + 5)
+    c1 = 2 / ((n + 1.3) ** 2 + mueff)
+    cmu = min(1 - c1, 2 * (mueff - 2 + 1 / mueff) / ((n + 2) ** 2 + mueff))
+    damps = 1 + 2 * max(0.0, math.sqrt((mueff - 1) / (n + 1)) - 1) + cs
+    chi_n = math.sqrt(n) * (1 - 1 / (4 * n) + 1 / (21 * n * n))
+    C, pc, ps = np.eye(n), np.zeros(n), np.zeros(n)
+    for g in range(iters):
+        D2, B = np.linalg.eigh(C)
+        D = np.sqrt(np.maximum(D2, 1e-20))
+        y = rng.standard_normal((lam, n)) @ (B * D).T
+        z = m + sigma * y
+        f = evaluate_z(z)
+        order = np.argsort(f)
+        if f[order[0]] < best_f:
+            best_f, best_z = float(f[order[0]]), repair(z[order[:1]])[0]
+        ys = y[order[:mu]]
+        yw = wts @ ys
+        m = m + sigma * yw
+        m[ang] %= 1.0
+        m = np.clip(m, -0.1, 1.1)
+        ps = (1 - cs) * ps + math.sqrt(cs * (2 - cs) * mueff) * (B @ ((B.T @ yw) / D))
+        hsig = np.linalg.norm(ps) / math.sqrt(1 - (1 - cs) ** (2 * (g + 1))) / chi_n < (
+            1.4 + 2 / (n + 1)
+        )
+        pc = (1 - cc) * pc + hsig * math.sqrt(cc * (2 - cc) * mueff) * yw
+        C = (
+            (1 - c1 - cmu) * C
+            + c1 * (np.outer(pc, pc) + (1 - hsig) * cc * (2 - cc) * C)
+            + cmu * (ys.T * wts) @ ys
+        )
+        C = (C + C.T) / 2
+        sigma = min(sigma * math.exp((cs / damps) * (np.linalg.norm(ps) / chi_n - 1)), 1.0)
+    return lo + best_z * span, best_f
+
+
 def cem(
     room: Room,
     team: list[Operator],
@@ -167,7 +242,10 @@ def cem(
     pop: int = 40,
     elite: int = 8,
     seed: int = 0,
+    method: str = "cem",
 ) -> tuple[np.ndarray, float]:
+    """Search the plan space for weight w; every valid evaluation goes into the archive.
+    method: 'cem' (default) or 'cmaes' (second optimizer family, same budget)."""
     lo, hi = bounds(len(team))
 
     def score_batch(xs: np.ndarray) -> list[float]:
@@ -180,4 +258,6 @@ def cem(
         return out
 
     cols = tuple(a * PER_OP + j for a in range(len(team)) for j in ANGLES)
+    if method == "cmaes":
+        return cmaes_minimize(score_batch, lo, hi, init, iters, pop, seed, cols)
     return cem_minimize(score_batch, lo, hi, init, iters, pop, elite, seed, cols)

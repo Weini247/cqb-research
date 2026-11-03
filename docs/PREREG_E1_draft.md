@@ -49,22 +49,27 @@ the size of the gap?
 
 ## 4. Procedure
 
-For each confirmatory room: evaluate the four playbooks; run CEM (`optimize.cem_minimize`,
-20 % random immigrants) with **60 iterations x 64 samples x 4 weights**, seeded with the
-playbooks, for optimizer seeds 0-4 (budget from the saturation study, REPORT_M2.md). **Pool the
-archives of all 5 seeds** per room (multi-start search). **Scope of E1: single rooms only**
+For each confirmatory room: evaluate the four playbooks; run **two optimizer families**, CEM
+(`optimize.cem_minimize`, 20 % random immigrants) and CMA-ES (`optimize.cmaes_minimize`,
+standard parameters), each with **60 iterations x 64 samples x 4 weights**, seeded with the
+playbooks, for optimizer seeds 0-4 (budget and second family from REPORT_M2.md). **Pool the
+archives of all 10 runs** per room (`killhouse-bench --optimizer cem cmaes --seeds 5`). **Scope of E1: single rooms only**
 (apartments are a separate later study). Gap per technique and room = relative reduction of
 `risk_multi` at equal-or-better `t_clear` and fratricide (`gap_risk`), computed on held-out
 threat scenarios for **one candidate per technique that was selected on planning scenarios
 from the pooled archive** (lowest planning risk at equal-or-better time and fratricide). The
 optimistic best-of-front value is reported only as secondary. Tests use rooms as the unit.
 
-**Saturation (judged across seeds, not within a run):** a room counts as saturated when at
-least 3 of 5 seeds reach the pooled best planning risk within 2 %. Unsaturated rooms are kept
-and reported, with their gaps marked as lower bounds. Per room and technique, the per-seed gap
-spread and the number of seeds that leave the seeded playbook are reported as reliability
-measures. (REPORT_M2 showed that a run stuck at its starting playbook passes a within-run
-criterion, and that the median over seeds hides bimodal outcomes.)
+**Reliability (judged across runs, not within a run):** a room-technique pair is
+**method-stable** when the pooled gaps of the two families, each computed on its own five
+archives, differ by at most 5 points (`METHOD_TOL`). Pairs that are not are kept and reported,
+with their gaps marked as lower bounds; the share of method-stable pairs is a reported outcome.
+Per pair, the per-run gaps and the number of runs that leave the seeded playbook are reported
+as well. H1 is tested on the pooled gaps and repeated for each family alone; a result that
+holds for one family only is reported as such. (REPORT_M2: a run stuck at its starting playbook
+passes a within-run criterion, the median over seeds hides bimodal outcomes, a 2 % seed rule
+did not separate the stable from the unstable rooms, and in centre-fed rooms the gap ranking
+between techniques changed with the optimizer.)
 
 ## 5. Hypotheses and decision rules
 
@@ -103,6 +108,8 @@ scope, stylized playbooks.
   60x64x4; seeds combined by pooling archives instead of the median; saturation judged across
   seeds. Pooled estimator implemented (`bench.py --seeds 5`) and piloted on two development
   rooms: no centre-fed technique saturated (1-2 of 5 seeds at the pooled best).
+- 2026-11-03: cross-check M2c (REPORT_M2.md): second optimizer family (CMA-ES) added and pooled;
+  the 2 % seed rule replaced by method agreement within 5 points; H1 repeated per family.
 
 - 2026-11-02: first draft after the E1 pilot (multi-threat objective, dead-space step,
   room generator).

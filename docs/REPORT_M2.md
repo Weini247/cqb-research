@@ -106,10 +106,69 @@ fraction of a percent, which does not show on held-out scenarios.
 - In M-center the pooled best for crisscross, buttonhook and limited penetration is the same
   strategy (planning risk 0.481): the techniques differ, the reachable optimum does not.
 
+## M2c: cross-check with a second optimizer family (CMA-ES)
+
+`optimize.cmaes_minimize`: standard CMA-ES (Hansen's default parameters, full covariance, no
+restarts, no tuning on these rooms), same plan space, same starting playbooks, same budget
+(60x64 per weight, 5 seeds, pooled). On the reference cases: a shifted sphere is solved, and
+the L-corridor watchman optimum is found in 17/20 seeds (CEM with immigrants 20/20, without
+11/20). Run: `killhouse-bench --optimizer cmaes --seeds 5 --iters 60 --pop 64`
+(`out/cmaes-check`, 12 min), compared with the pooled CEM runs (`out/pooled-pilot`,
+`out/pooled-corner`).
+
+| room | technique | CEM pooled gap | CMA-ES pooled gap | CMA-ES per-seed gaps (%) |
+|---|---|---|---|---|
+| M-center | crisscross | 23 % | 16 % | 0, 0, 16, 0, 7 |
+| M-center | buttonhook | 15 % | **22 %** | 0, 0, 22, 0, 14 |
+| M-center | pie + crisscross | 15 % | 12 % | 12, 5, 4, 7, 1 |
+| M-center | limited penetration | 15 % | **22 %** | 0, 0, 22, 0, 14 |
+| M-corner | crisscross | 35 % | 32 % | 24, 27, 32, 27, 22 |
+| M-corner | buttonhook | 53 % | 52 % | 46, 46, 51, 52, 44 |
+| M-corner | pie + crisscross | 25 % | 22 % | 16, 16, 21, 22, 17 |
+| M-corner | limited penetration | 54 % | 47 % | 47, 47, 50, 46, 47 |
+| L-center | crisscross | 26 % | 15 % | 0, 15, 0, 20, 14 |
+| L-center | buttonhook | 30 % | 22 % | 11, 22, 0, 24, 21 |
+| L-center | pie + crisscross | 20 % | 11 % | 15, -2, 8, 11, 1 |
+| L-center | limited penetration | 29 % | 22 % | 11, 22, 0, 23, 20 |
+
+### Findings
+
+1. **The centre-fed gaps are not a CEM artefact.** CMA-ES also finds strategies 11-22 % below
+   every technique in both centre-fed rooms.
+2. **The bimodality is not CEM-specific either.** CMA-ES seeds also split into "stays at the
+   technique" (0 %) and 14-24 %. Both methods start from the playbooks, so this points to a
+   start basin that is hard to leave, not to one optimizer's weakness.
+3. **Neither method dominates.** CEM is better in 10 of 12 cases (by 1-11 points), CMA-ES in
+   M-center buttonhook and limited penetration (by 7 points). The gap of a single method is
+   therefore a lower bound that can be off by about 10 points.
+4. **The gap ranking between techniques depends on the optimizer in centre-fed rooms.** With CEM,
+   crisscross has the largest gap in M-center (23 % vs. 15 %); with CMA-ES, buttonhook and limited
+   penetration do (22 % vs. 16 %). In the corner-fed room both methods agree on the order
+   (limited penetration ~ buttonhook > crisscross > pie + crisscross) and on the size within
+   1-7 points. This is a direct instance of the research question: a comparison that looks
+   like a property of the techniques is partly a property of the evaluation protocol.
+5. **The across-seed rule from M2b is miscalibrated.** With a 2 % risk tolerance even the
+   corner-fed room, whose gaps vary by only 1-4 points across seeds, has only 1-2 of 5 seeds
+   "at the best". The rule does not separate the stable room from the unstable ones.
+
+### Consequences for the preregistration (proposed, replaces the M2b proposal)
+
+- Run **both optimizer families** (CEM and CMA-ES, 5 seeds each, 60x64x4) and pool all ten
+  archives; select one candidate per technique on planning scenarios from the pooled archive.
+  Cost about 13 h for 40 rooms on the current GPU.
+- **Agreement instead of the 2 % seed rule:** a room-technique pair is "method-stable" when the
+  two single-method pooled gaps differ by at most 5 points. Pairs that are not are kept and
+  reported as lower bounds; the share of method-stable pairs is itself a reported outcome.
+- Hypotheses about gap *differences between techniques* (H1) are tested on the pooled gap and
+  repeated on each method alone; a result that holds for only one method is reported as such.
+
 ### Limitations
 
 - Three rooms, five seeds; no confidence intervals beyond the seed spread.
-- Only CEM was tested. A second optimizer family (for example CMA-ES or a structured local
-  search) would show whether the centre-fed basin is hard to reach or merely hard for CEM.
+- Two optimizer families, both distribution-based and both started from the playbooks. A
+  structurally different searcher (for example a local search on the discrete structure:
+  who enters, in which order, which point of domination) is not covered.
+- The 5-point agreement tolerance and the decision to run both families were set after seeing
+  these three development rooms; they are fixed before the confirmatory rooms are touched.
 - With 1-2 of 5 seeds at the best, 5 seeds may be too few for centre-fed rooms; a second
   optimizer family is the more informative next check than a larger CEM budget.

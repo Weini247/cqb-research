@@ -103,6 +103,17 @@ def test_bench_pools_seed_archives():
             assert d["gap_selected"] >= min(d["gap_per_seed"]) - 1e-3
 
 
+def test_bench_pools_optimizer_families():
+    room = next(r for r in standard_rooms() if r.name == "S-center")
+    res = bench_room(room, TEAM, 3, 8, seed=0, log=lambda s: None, methods=("cem", "cmaes"))
+    assert res["runs"] == ["cem:0", "cmaes:0"]
+    for d in res["doctrines"]:
+        if d["feasible"]:
+            assert set(d["gap_by_method"]) == {"cem", "cmaes"}
+            # the pooled pick has the lowest planning risk, so it is one method's pick
+            assert any(abs(d["gap_selected"] - g) < 1e-3 for g in d["gap_by_method"].values())
+
+
 def test_threat_model_rewards_more_guns_and_faster_engagement():
     pb = doctrines(ROOM, TEAM)[0]
     two = Playbook("2", [dataclasses.replace(o, enter=i < 2) for i, o in enumerate(pb.ops)])

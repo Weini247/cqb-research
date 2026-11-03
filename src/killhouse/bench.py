@@ -57,6 +57,7 @@ def _replay(room: Room, name: str, pb: Playbook, res: Result) -> dict:
 SAT_TOL = 0.02  # a seed "reaches" the pooled best within 2 % planning risk (REPORT_M2)
 SAT_MIN = 3  # ... and a doctrine counts as saturated when at least 3 seeds do
 LEAVE_TOL = 0.005  # a seed "leaves" its seeded doctrine below 0.5 % of its planning risk
+METHOD_TOL = 0.05  # pooled gaps of the optimizer families agree within 5 points (REPORT_M2 M2c)
 
 
 def select(archive: Archive, d: dict) -> int:
@@ -80,10 +81,18 @@ def saturation(per_seed: list[float], pooled: float, doctrine: float) -> dict:
 
 
 def bench_room(
-    room: Room, team, iters: int, pop: int, seed: int, log=print, n_seeds: int = 1
+    room: Room,
+    team,
+    iters: int,
+    pop: int,
+    seed: int,
+    log=print,
+    n_seeds: int = 1,
+    methods: tuple[str, ...] = ("cem",),
 ) -> dict:
-    """Doctrines vs best found. With n_seeds > 1 the archives of seeds seed..seed+n-1 are pooled
-    (multi-start search, REPORT_M2) and per-seed gaps plus saturation are reported."""
+    """Doctrines vs best found. The archives of all runs (methods x seeds seed..seed+n-1) are
+    pooled (multi-start search, REPORT_M2). With several runs, per-run gaps and saturation are
+    reported; with several methods also the pooled gap of each method and its agreement."""
     docs = doctrines(room, team)
     doc_out, replays, planned = [], [], []
     for pb in docs:
@@ -94,21 +103,38 @@ def bench_room(
         doc_out[-1]["risk_planning"] = round(plan.objective(optimize.OBJECTIVE), 4)
         replays.append(_replay(room, pb.name, pb, res))
     init = [encode(pb, room, team) for pb in docs]
-    seed_archives = []
-    for s in range(seed, seed + n_seeds):
-        archive = Archive()
-        for plan, x in zip(planned, init, strict=True):
-            archive.add(plan, x)
-        for k, w in enumerate(WEIGHTS):
-            t0 = time.perf_counter()
-            cem(room, team, w, init, archive, iters=iters, pop=pop, seed=s * 100 + k)
-            dt = time.perf_counter() - t0
-            log(f"  {room.name} seed {s} w={w}: {len(archive.rows)} valid evals ({dt:.0f}s)")
-        seed_archives.append(archive)
-    archive = Archive()
-    for a in seed_archives:
-        archive.rows += a.rows
-        archive.xs += a.xs
+    runs, seed_archives = [], []
+    for m in methods:
+        for s in range(seed, seed + n_seeds):
+            archive = Archive()
+            for plan, x in zip(planned, init, strict=True):
+                archive.add(plan, x)
+            for k, w in enumerate(WEIGHTS):
+                t0 = time.perf_counter()
+                cem(
+                    room,
+                    team,
+                    w,
+                    init,
+                    archive,
+                    iters=iters,
+                    pop=pop,
+                    seed=s * 100 + k,
+                    method=m,
+                )
+                dt = time.perf_counter() - t0
+                log(f"  {room.name} {m} seed {s} w={w}: {len(archive.rows)} valid ({dt:.0f}s)")
+            runs.append((m, s))
+            seed_archives.append(archive)
+
+    def pool(archives: list[Archive]) -> Archive:
+        out = Archive()
+        for a in archives:
+            out.rows += a.rows
+            out.xs += a.xs
+        return out
+
+    archive = pool(seed_archives)
     # Primary gap (review R3): ONE candidate per doctrine is chosen on planning scenarios
     # (lowest planning risk at equal-or-better time and fratricide) and only that candidate is
     # scored on held-out scenarios. Taking the best of several re-scored candidates would
@@ -130,7 +156,16 @@ def bench_room(
         r_sel = held_risk(archive, i)
         d["selected_risk"] = round(r_sel, 4)
         d["gap_selected"] = round(1 - r_sel / d[optimize.OBJECTIVE], 4)  # may be negative
-        if n_seeds > 1:
+        if len(methods) > 1:
+            d["gap_by_method"] = {}
+            for m in methods:
+                pm = pool([a for (mm, _), a in zip(runs, seed_archives, strict=True) if mm == m])
+                d["gap_by_method"][m] = round(
+                    1 - held_risk(pm, select(pm, d)) / d[optimize.OBJECTIVE], 4
+                )
+            g = d["gap_by_method"].values()
+            d["method_stable"] = max(g) - min(g) <= METHOD_TOL + 1e-9
+        if len(runs) > 1:
             idx = [select(a, d) for a in seed_archives]
             d["gap_per_seed"] = [
                 round(1 - held_risk(a, j) / d[optimize.OBJECTIVE], 4)
@@ -183,6 +218,7 @@ def bench_room(
         "cloud": cloud,
         "n_valid": len(archive.rows),
         "n_seeds": n_seeds,
+        "runs": [f"{m}:{s}" for m, s in runs],
         "replays": replays,
     }
 
@@ -201,6 +237,13 @@ def main(argv: list[str] | None = None) -> None:
         type=int,
         metavar=("SEED", "N"),
         help="use N generated rooms from generator SEED instead of the standard set",
+    )
+    ap.add_argument(
+        "--optimizer",
+        nargs="+",
+        choices=("cem", "cmaes"),
+        default=["cem"],
+        help="one or more optimizer families; all their archives are pooled",
     )
     ap.add_argument("--iters", type=int, default=30)
     ap.add_argument("--pop", type=int, default=32)
@@ -223,6 +266,7 @@ def main(argv: list[str] | None = None) -> None:
                 a.seed,
                 log=lambda s: print(s, flush=True),
                 n_seeds=a.seeds,
+                methods=tuple(a.optimizer),
             )
         )
     data = {
@@ -233,8 +277,10 @@ def main(argv: list[str] | None = None) -> None:
             "weights": WEIGHTS,
             "seed": a.seed,
             "n_seeds": a.seeds,
+            "optimizer": a.optimizer,
             "sat_tol": SAT_TOL,
             "sat_min": SAT_MIN,
+            "method_tol": METHOD_TOL,
             "objective": optimize.OBJECTIVE,
             "n_threats": entry.DEFAULT_CFG.n_threats,
             "n_scenarios": entry.DEFAULT_CFG.n_scenarios,
@@ -269,9 +315,16 @@ def main(argv: list[str] | None = None) -> None:
                     f"{d['t_clear']:5.1f} {d['fratricide']:4.1f} {d['risk_best']:6.3f} "
                     f"{d['gap_risk'] * 100:4.0f}%"
                     + (
-                        f"  at best {d['seeds_at_best']}/{a.seeds}"
-                        f", left doctrine {d['seeds_leaving']}/{a.seeds}"
+                        f"  at best {d['seeds_at_best']}/{len(r['runs'])}"
+                        f", left doctrine {d['seeds_leaving']}/{len(r['runs'])}"
                         if "saturated" in d
+                        else ""
+                    )
+                    + (
+                        "  by method "
+                        + " ".join(f"{m} {g * 100:.0f}%" for m, g in d["gap_by_method"].items())
+                        + (" (stable)" if d["method_stable"] else " (DISAGREE)")
+                        if "gap_by_method" in d
                         else ""
                     )
                 )
