@@ -77,9 +77,39 @@ Mean gap ± standard deviation across 5 seeds (n0 = seeds with gap < 0.5 %):
 - **Interpretation:** all gaps stay lower bounds on what is attainable in the model. Centre-fed
   gaps are expected to be underestimated more than corner-fed ones.
 
+### Pilot of the pooled estimator
+
+Implemented in `bench.py` (`--seeds N`, functions `select` and `saturation`). Pilot:
+`killhouse-bench --rooms M-center L-center --iters 60 --pop 64 --seeds 5` (10 min on the GPU).
+The per-seed gaps reproduce the 60x64 rows of the saturation study exactly, so the runs are
+deterministic per seed.
+
+| room | technique | pooled gap | per-seed gaps (%) | seeds at pooled best | seeds leaving the technique |
+|---|---|---|---|---|---|
+| M-center | crisscross | 23 % | 11, 17, 19, 0, 23 | 2/5 | 4/5 |
+| M-center | buttonhook | 15 % | 0, 0, 15, 0, 16 | 2/5 | 2/5 |
+| M-center | pie + crisscross | 15 % | 5, 15, 6, 3, 6 | 1/5 | 5/5 |
+| M-center | limited penetration | 15 % | 0, 0, 15, 0, 16 | 2/5 | 5/5 * |
+| L-center | crisscross | 26 % | 26, 8, 13, 11, 10 | 1/5 | 5/5 |
+| L-center | buttonhook | 30 % | 30, 0, 0, 0, 8 | 1/5 | 2/5 |
+| L-center | pie + crisscross | 20 % | 8, 20, 4, 13, 7 | 2/5 | 5/5 |
+| L-center | limited penetration | 29 % | 29, 0, 0, 0, 7 | 1/5 | 2/5 |
+
+\* "leaving" is measured on planning risk with a 0.5 % tolerance; here the seeds left by a
+fraction of a percent, which does not show on held-out scenarios.
+
+- No centre-fed technique reaches the saturation rule (at least 3 of 5 seeds at the pooled best).
+  Under the proposed prereg these gaps would be reported as lower bounds.
+- Pooling matters: for M-center buttonhook the median over seeds is 0 %, the pooled gap 15 %.
+  The pooled pick is still one candidate chosen on planning scenarios only, so it adds search
+  effort, not a held-out selection bias.
+- In M-center the pooled best for crisscross, buttonhook and limited penetration is the same
+  strategy (planning risk 0.481): the techniques differ, the reachable optimum does not.
+
 ### Limitations
 
 - Three rooms, five seeds; no confidence intervals beyond the seed spread.
 - Only CEM was tested. A second optimizer family (for example CMA-ES or a structured local
   search) would show whether the centre-fed basin is hard to reach or merely hard for CEM.
-- The pooled-archive estimator is proposed but not yet implemented in `bench.py`.
+- With 1-2 of 5 seeds at the best, 5 seeds may be too few for centre-fed rooms; a second
+  optimizer family is the more informative next check than a larger CEM budget.

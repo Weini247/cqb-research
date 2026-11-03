@@ -54,21 +54,61 @@ def _replay(room: Room, name: str, pb: Playbook, res: Result) -> dict:
     }
 
 
-def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> dict:
+SAT_TOL = 0.02  # a seed "reaches" the pooled best within 2 % planning risk (REPORT_M2)
+SAT_MIN = 3  # ... and a doctrine counts as saturated when at least 3 seeds do
+LEAVE_TOL = 0.005  # a seed "leaves" its seeded doctrine below 0.5 % of its planning risk
+
+
+def select(archive: Archive, d: dict) -> int:
+    """Index of the ONE candidate for doctrine d, chosen on planning scenarios only.
+
+    Lowest planning risk at equal-or-better time and fratricide than the doctrine (review R3).
+    """
+    cand = [
+        i
+        for i, (_, t, fr) in enumerate(archive.rows)
+        if t <= d["t_clear"] + 1e-9 and fr <= d["fratricide"] + 1e-9
+    ]
+    return min(cand, key=lambda i: archive.rows[i][0])
+
+
+def saturation(per_seed: list[float], pooled: float, doctrine: float) -> dict:
+    """Across-seed saturation of one doctrine from per-seed and pooled planning risks."""
+    reach = sum(r <= pooled * (1 + SAT_TOL) + 1e-9 for r in per_seed)
+    leave = sum(r < doctrine * (1 - LEAVE_TOL) for r in per_seed)
+    return {"seeds_at_best": reach, "seeds_leaving": leave, "saturated": reach >= SAT_MIN}
+
+
+def bench_room(
+    room: Room, team, iters: int, pop: int, seed: int, log=print, n_seeds: int = 1
+) -> dict:
+    """Doctrines vs best found. With n_seeds > 1 the archives of seeds seed..seed+n-1 are pooled
+    (multi-start search, REPORT_M2) and per-seed gaps plus saturation are reported."""
     docs = doctrines(room, team)
-    archive = Archive()
-    doc_out, replays = [], []
+    doc_out, replays, planned = [], [], []
     for pb in docs:
-        archive.add(evaluate(room, pb, team), encode(pb, room, team))  # planning scenarios
+        plan = evaluate(room, pb, team)  # planning scenarios
         res = evaluate(room, pb, team, keep=True, cfg=EVAL_CFG)  # held-out scenarios
+        planned.append(plan)
         doc_out.append({"name": pb.name, **res.metrics()})
+        doc_out[-1]["risk_planning"] = round(plan.objective(optimize.OBJECTIVE), 4)
         replays.append(_replay(room, pb.name, pb, res))
     init = [encode(pb, room, team) for pb in docs]
-    for k, w in enumerate(WEIGHTS):
-        t0 = time.perf_counter()
-        cem(room, team, w, init, archive, iters=iters, pop=pop, seed=seed * 100 + k)
-        dt = time.perf_counter() - t0
-        log(f"  {room.name} w={w}: {len(archive.rows)} valid evals ({dt:.0f}s)")
+    seed_archives = []
+    for s in range(seed, seed + n_seeds):
+        archive = Archive()
+        for plan, x in zip(planned, init, strict=True):
+            archive.add(plan, x)
+        for k, w in enumerate(WEIGHTS):
+            t0 = time.perf_counter()
+            cem(room, team, w, init, archive, iters=iters, pop=pop, seed=s * 100 + k)
+            dt = time.perf_counter() - t0
+            log(f"  {room.name} seed {s} w={w}: {len(archive.rows)} valid evals ({dt:.0f}s)")
+        seed_archives.append(archive)
+    archive = Archive()
+    for a in seed_archives:
+        archive.rows += a.rows
+        archive.xs += a.xs
     # Primary gap (review R3): ONE candidate per doctrine is chosen on planning scenarios
     # (lowest planning risk at equal-or-better time and fratricide) and only that candidate is
     # scored on held-out scenarios. Taking the best of several re-scored candidates would
@@ -78,19 +118,31 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
         held.add(
             evaluate(room, decode(archive.xs[i], room, team), team, cfg=EVAL_CFG), archive.xs[i]
         )
+
+    def held_risk(a: Archive, i: int) -> float:
+        res = evaluate(room, decode(a.xs[i], room, team), team, cfg=EVAL_CFG)
+        return res.objective(optimize.OBJECTIVE)
+
     for d in doc_out:
         if not d["feasible"]:
             continue
-        cand = [
-            i
-            for i, (_, t, fr) in enumerate(archive.rows)
-            if t <= d["t_clear"] + 1e-9 and fr <= d["fratricide"] + 1e-9
-        ]
-        i = min(cand, key=lambda i: archive.rows[i][0])
-        sel = evaluate(room, decode(archive.xs[i], room, team), team, cfg=EVAL_CFG)
-        r_sel = sel.objective(optimize.OBJECTIVE)
+        i = select(archive, d)
+        r_sel = held_risk(archive, i)
         d["selected_risk"] = round(r_sel, 4)
         d["gap_selected"] = round(1 - r_sel / d[optimize.OBJECTIVE], 4)  # may be negative
+        if n_seeds > 1:
+            idx = [select(a, d) for a in seed_archives]
+            d["gap_per_seed"] = [
+                round(1 - held_risk(a, j) / d[optimize.OBJECTIVE], 4)
+                for a, j in zip(seed_archives, idx, strict=True)
+            ]
+            d.update(
+                saturation(
+                    [a.rows[j][0] for a, j in zip(seed_archives, idx, strict=True)],
+                    archive.rows[i][0],
+                    d["risk_planning"],
+                )
+            )
         opt = held.gap(d[optimize.OBJECTIVE], d["t_clear"], d["fratricide"])
         d["gap_best_of_front"] = opt["gap_risk"]  # optimistic: max over re-scored front
         d["risk_best"], d["t_best"], d["gap_time"] = (
@@ -130,6 +182,7 @@ def bench_room(room: Room, team, iters: int, pop: int, seed: int, log=print) -> 
         "front_plans": front_plans,
         "cloud": cloud,
         "n_valid": len(archive.rows),
+        "n_seeds": n_seeds,
         "replays": replays,
     }
 
@@ -139,6 +192,9 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--quick", action="store_true", help="tiny budget for smoke tests")
     ap.add_argument("--rooms", nargs="*", help="room names (default: all)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument(
+        "--seeds", type=int, default=1, help="pool the archives of seeds seed..seed+N-1"
+    )
     ap.add_argument(
         "--generated",
         nargs=2,
@@ -159,7 +215,15 @@ def main(argv: list[str] | None = None) -> None:
     for room in rooms:
         print(f"{room.name} ...", flush=True)
         results.append(
-            bench_room(room, team, iters, pop, a.seed, log=lambda s: print(s, flush=True))
+            bench_room(
+                room,
+                team,
+                iters,
+                pop,
+                a.seed,
+                log=lambda s: print(s, flush=True),
+                n_seeds=a.seeds,
+            )
         )
     data = {
         "schema": "killhouse.bench/0",
@@ -168,6 +232,9 @@ def main(argv: list[str] | None = None) -> None:
             "pop": pop,
             "weights": WEIGHTS,
             "seed": a.seed,
+            "n_seeds": a.seeds,
+            "sat_tol": SAT_TOL,
+            "sat_min": SAT_MIN,
             "objective": optimize.OBJECTIVE,
             "n_threats": entry.DEFAULT_CFG.n_threats,
             "n_scenarios": entry.DEFAULT_CFG.n_scenarios,
@@ -201,6 +268,12 @@ def main(argv: list[str] | None = None) -> None:
                     f"{r['room']['name']:14s} {d['name']:20s} {d[optimize.OBJECTIVE]:6.3f} "
                     f"{d['t_clear']:5.1f} {d['fratricide']:4.1f} {d['risk_best']:6.3f} "
                     f"{d['gap_risk'] * 100:4.0f}%"
+                    + (
+                        f"  at best {d['seeds_at_best']}/{a.seeds}"
+                        f", left doctrine {d['seeds_leaving']}/{a.seeds}"
+                        if "saturated" in d
+                        else ""
+                    )
                 )
             else:
                 print(f"{r['room']['name']:14s} {d['name']:20s} invalid (not cleared / collision)")

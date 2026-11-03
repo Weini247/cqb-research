@@ -43,7 +43,8 @@ would be separate research with its own tasks and evidence.
 ## Neue Reihenfolge (Plattform-Pfad)
 
 1. ✅ M2a Referenzfälle mit bekannter Lösung · ✅ M2b Seed-Streuung und Sättigung
-   ([REPORT_M2](REPORT_M2.md)); offen: Schätzer mit gepoolten Archiven, dann Analyseplan einfrieren
+   ([REPORT_M2](REPORT_M2.md)); ✅ Schätzer mit gepoolten Archiven; offen: zweites
+   Optimierverfahren als Gegenprobe, dann Analyseplan einfrieren
 2. Schnittstelle für Planungsverfahren und Aufgabenspezifikation; klassische Vergleichsverfahren
    (zufällige Suche, gierige Sichtabdeckung, Watchman-Route)
 3. Fehlerdiagnose pro Durchlauf (ungesehener Bereich, Kollision, späte Identifikation, ...)

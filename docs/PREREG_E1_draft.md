@@ -101,7 +101,8 @@ scope, stylized playbooks.
 
 - 2026-11-02: method check M2 (REPORT_M2.md): CEM with random immigrants; budget fixed at
   60x64x4; seeds combined by pooling archives instead of the median; saturation judged across
-  seeds. The pooled-archive estimator still has to be implemented before the freeze.
+  seeds. Pooled estimator implemented (`bench.py --seeds 5`) and piloted on two development
+  rooms: no centre-fed technique saturated (1-2 of 5 seeds at the pooled best).
 
 - 2026-11-02: first draft after the E1 pilot (multi-threat objective, dead-space step,
   room generator).

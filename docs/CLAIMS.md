@@ -11,7 +11,7 @@ Nothing here is confirmatory (see RUNLOG.md).
 | C2 | Pie + crisscross < crisscross (164/164) at 2.5-3 s more time | supported (exploratory) | same | as C1 |
 | C3 | The optimizer finds lower-risk strategies than every stylized technique (1-54 %) | supported, **low reliability** | `out/bench-r3`, `out/bench-r3-s1`, f4f44ee | seeds differ by up to 20 points; see C3a/C3b |
 | C3a | Corner-fed M room: gaps are saturated and seed-stable from 30x64 on (22-53 %, spread 1-4 points) | supported (exploratory) | `out/saturation.json`, REPORT_M2, b1ca549 | held-out rooms |
-| C3b | Centre-fed rooms: outcomes are bimodal across seeds (0 % or 15-30 %) even at 60x128; a per-seed gap of 0 does not show the technique is optimal | supported (exploratory) | same | second optimizer family; pooled-archive estimator |
+| C3b | Centre-fed rooms: outcomes are bimodal across seeds (0 % or 15-30 %) even at 60x128; a per-seed gap of 0 does not show the technique is optimal | supported (exploratory) | same + `out/pooled-pilot` (pooled 5 seeds: 15-30 %, 1-2/5 seeds at best) | second optimizer family |
 | C12 | Visibility code and CEM reproduce known reference answers (comb gallery k = 2-4; L-corridor watchman 4.51 m in 20/20 seeds after the random-immigrant fix) | supported | `tests/test_reference.py`, REPORT_M2, ee64dc1 | more reference cases (multi-agent) |
 | C4 | "Gaps only for corner-fed / small rooms; 0 % for centre-fed" | **retracted** | an artefact of too small a budget (bench-r1 vs. bench-r3) | — |
 | C5 | In apartments, limited penetration + dead-space step has the lowest risk | hypothesis | `out/apartment`, 3 apartments, d2214df | more apartments, completion-adjusted comparison, cause analysis |

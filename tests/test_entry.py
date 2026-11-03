@@ -3,6 +3,7 @@ import json
 
 import numpy as np
 
+from killhouse.bench import bench_room, saturation
 from killhouse.bench import main as bench_main
 from killhouse.doctrine import doctrines
 from killhouse.entry import ModelCfg, OpPlan, Playbook, evaluate
@@ -81,6 +82,25 @@ def test_bench_quick(tmp_path):
     html3d = (tmp_path / "viewer3d.html").read_text(encoding="utf-8")
     assert "/*__DATA__*/null" not in html3d and "three@0.160.0" in html3d
     assert '"cloud"' not in html3d  # viewer payload is stripped to what it renders
+
+
+def test_saturation_counts_seeds_across_runs():
+    # pooled best 0.40, doctrine 0.60: two seeds at the best, one stuck at the doctrine
+    s = saturation([0.40, 0.405, 0.60, 0.50, 0.45], pooled=0.40, doctrine=0.60)
+    assert s == {"seeds_at_best": 2, "seeds_leaving": 4, "saturated": False}
+    assert saturation([0.40] * 3 + [0.6] * 2, 0.40, 0.60)["saturated"]
+
+
+def test_bench_pools_seed_archives():
+    room = next(r for r in standard_rooms() if r.name == "S-center")
+    res = bench_room(room, TEAM, 3, 8, seed=0, log=lambda s: None, n_seeds=2)
+    assert res["n_seeds"] == 2
+    for d in res["doctrines"]:
+        if d["feasible"]:
+            assert len(d["gap_per_seed"]) == 2
+            # the pooled pick is one seed's pick, so at least one seed reaches it
+            assert d["seeds_at_best"] >= 1
+            assert d["gap_selected"] >= min(d["gap_per_seed"]) - 1e-3
 
 
 def test_threat_model_rewards_more_guns_and_faster_engagement():
