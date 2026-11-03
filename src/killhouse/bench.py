@@ -255,6 +255,9 @@ def main(argv: list[str] | None = None) -> None:
     rooms = [r for r in pool if not a.rooms or r.name in a.rooms]
     t0 = time.perf_counter()
     results = []
+    a.out.mkdir(parents=True, exist_ok=True)
+    partial = a.out / "rooms.partial.jsonl"  # one line per finished room: long runs survive a crash
+    partial.write_text("", encoding="utf-8")
     for room in rooms:
         print(f"{room.name} ...", flush=True)
         results.append(
@@ -269,6 +272,8 @@ def main(argv: list[str] | None = None) -> None:
                 methods=tuple(a.optimizer),
             )
         )
+        with partial.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(results[-1]) + "\n")
     data = {
         "schema": "killhouse.bench/0",
         "config": {
