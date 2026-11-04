@@ -60,6 +60,11 @@ LEAVE_TOL = 0.005  # a seed "leaves" its seeded doctrine below 0.5 % of its plan
 METHOD_TOL = 0.05  # pooled gaps of the optimizer families agree within 5 points (REPORT_M2 M2c)
 
 
+def rel_gap(found: float, ref: float) -> float | None:
+    """Relative risk reduction, may be negative; undefined (None) if the reference risk is 0."""
+    return 1 - found / ref if ref > 0 else None
+
+
 def select(archive: Archive, d: dict) -> int:
     """Index of the ONE candidate for doctrine d, chosen on planning scenarios only.
 
@@ -100,7 +105,10 @@ def bench_room(
         res = evaluate(room, pb, team, keep=True, cfg=EVAL_CFG)  # held-out scenarios
         planned.append(plan)
         doc_out.append({"name": pb.name, **res.metrics()})
-        doc_out[-1]["risk_planning"] = round(plan.objective(optimize.OBJECTIVE), 4)
+        doc_out[-1]["risk_exact"] = res.objective(
+            optimize.OBJECTIVE
+        )  # unrounded, for gaps and tests
+        doc_out[-1]["risk_planning"] = plan.objective(optimize.OBJECTIVE)
         replays.append(_replay(room, pb.name, pb, res))
     init = [encode(pb, room, team) for pb in docs]
     runs, seed_archives = [], []
@@ -154,22 +162,21 @@ def bench_room(
             continue
         i = select(archive, d)
         r_sel = held_risk(archive, i)
-        d["selected_risk"] = round(r_sel, 4)
-        d["gap_selected"] = round(1 - r_sel / d[optimize.OBJECTIVE], 4)  # may be negative
+        ref = d["risk_exact"]
+        d["selected_risk"] = r_sel
+        d["x_selected"] = archive.xs[i].tolist()
+        d["gap_selected"] = rel_gap(r_sel, ref)
         if len(methods) > 1:
             d["gap_by_method"] = {}
             for m in methods:
                 pm = pool([a for (mm, _), a in zip(runs, seed_archives, strict=True) if mm == m])
-                d["gap_by_method"][m] = round(
-                    1 - held_risk(pm, select(pm, d)) / d[optimize.OBJECTIVE], 4
-                )
-            g = d["gap_by_method"].values()
-            d["method_stable"] = max(g) - min(g) <= METHOD_TOL + 1e-9
+                d["gap_by_method"][m] = rel_gap(held_risk(pm, select(pm, d)), ref)
+            g = list(d["gap_by_method"].values())
+            d["method_stable"] = None if None in g else max(g) - min(g) <= METHOD_TOL + 1e-9
         if len(runs) > 1:
             idx = [select(a, d) for a in seed_archives]
             d["gap_per_seed"] = [
-                round(1 - held_risk(a, j) / d[optimize.OBJECTIVE], 4)
-                for a, j in zip(seed_archives, idx, strict=True)
+                rel_gap(held_risk(a, j), ref) for a, j in zip(seed_archives, idx, strict=True)
             ]
             d.update(
                 saturation(
@@ -178,7 +185,7 @@ def bench_room(
                     d["risk_planning"],
                 )
             )
-        opt = held.gap(d[optimize.OBJECTIVE], d["t_clear"], d["fratricide"])
+        opt = held.gap(ref, d["t_clear"], d["fratricide"])
         d["gap_best_of_front"] = opt["gap_risk"]  # optimistic: max over re-scored front
         d["risk_best"], d["t_best"], d["gap_time"] = (
             opt["risk_best"],
@@ -318,7 +325,7 @@ def main(argv: list[str] | None = None) -> None:
                 print(
                     f"{r['room']['name']:14s} {d['name']:20s} {d[optimize.OBJECTIVE]:6.3f} "
                     f"{d['t_clear']:5.1f} {d['fratricide']:4.1f} {d['risk_best']:6.3f} "
-                    f"{d['gap_risk'] * 100:4.0f}%"
+                    f"{(d['gap_risk'] or 0) * 100:4.0f}%"
                     + (
                         f"  at best {d['seeds_at_best']}/{len(r['runs'])}"
                         f", left doctrine {d['seeds_leaving']}/{len(r['runs'])}"
@@ -327,7 +334,9 @@ def main(argv: list[str] | None = None) -> None:
                     )
                     + (
                         "  by method "
-                        + " ".join(f"{m} {g * 100:.0f}%" for m, g in d["gap_by_method"].items())
+                        + " ".join(
+                            f"{m} {(g or 0) * 100:.0f}%" for m, g in d["gap_by_method"].items()
+                        )
                         + (" (stable)" if d["method_stable"] else " (DISAGREE)")
                         if "gap_by_method" in d
                         else ""

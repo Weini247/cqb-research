@@ -1,8 +1,8 @@
 """Analysis plan of the E1 preregistration (PREREG_E1_draft.md, sections 4 and 5) as code.
 
 Reads the result files of `killhouse-bench --optimizer cem cmaes --seeds 5`, either
-`results.json` or `rooms.partial.jsonl`, and computes reliability measures and H1 and H2. It runs
-no simulation. H3 and H4 need other data; a p-value for H4 can be passed in for the Holm step.
+`results.json` or `rooms.partial.jsonl`, and computes reliability measures and H1 and H2, the
+whole test family of E1. It runs no simulation.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ CORNER_DIST = 1.6  # door centre at most this far from a side wall = corner-fed 
 H2_MIN_SHARE = 0.7
 ALPHA = 0.05
 N_BOOT = 10_000
+MAX_DRAWS = 20  # bootstrap gives up after MAX_DRAWS * n_boot resamples
 
 
 def family(name: str) -> str:
@@ -72,8 +73,20 @@ def valid_pairs(rows: list[dict]) -> list[tuple[dict, dict]]:
     return [(r, d) for r in rows for d in r["doctrines"] if d["feasible"]]
 
 
-def at_time_floor(r: dict, d: dict) -> bool:
-    """No run left the playbook and it already has the fastest time of the pooled front."""
+def risk(d: dict) -> float:
+    """Unrounded held-out risk; older result files hold only the rounded value."""
+    return d.get("risk_exact", d["risk_multi"])
+
+
+def gap_pairs(rows: list[dict]) -> list[tuple[dict, dict]]:
+    """Valid pairs with a defined gap (it is undefined if the technique has risk 0)."""
+    return [(r, d) for r, d in valid_pairs(rows) if d["gap_selected"] is not None]
+
+
+def no_improvement(r: dict, d: dict) -> bool:
+    """No run found an improvement and the playbook has the fastest time of the pooled front.
+
+    This does not show a structural limit: search failure is not excluded."""
     return d["seeds_leaving"] == 0 and d["t_clear"] <= min(f[1] for f in r["front"]) + 1e-9
 
 
@@ -99,26 +112,37 @@ def _ci(x: list[float]) -> list[float]:
 def corner_coefficient(gap, corner, width, n_boot: int = N_BOOT, seed: int = 0) -> dict:
     """Least squares gap ~ corner-fed + room width, bootstrap over rooms.
 
-    p is the share of resamples with a coefficient <= 0 (one-sided). Resamples containing only
-    one door class cannot estimate the coefficient and are drawn again."""
+    p is the share of resamples with a coefficient <= 0 (one-sided). Resamples that cannot
+    estimate the coefficient are drawn again, up to a limit. If the data or too many resamples
+    cannot estimate it, the result is not estimable and p is 1."""
     gap, corner, width = (np.asarray(v, float) for v in (gap, corner, width))
     X = np.c_[np.ones(len(gap)), corner, width]
+    fail = {"estimable": False, "coef_corner": None, "coef_width": None, "ci": None, "p": 1.0}
+    if len(gap) < 4 or np.linalg.matrix_rank(X) < 3:
+        return fail
     beta = np.linalg.lstsq(X, gap, rcond=None)[0]
     rng = np.random.default_rng(seed)
     boot: list[float] = []
-    while len(boot) < n_boot:
+    for _ in range(MAX_DRAWS * n_boot):
         i = rng.integers(0, len(gap), len(gap))
-        if 0 < corner[i].sum() < len(i):
+        if np.linalg.matrix_rank(X[i]) == 3:
             boot.append(float(np.linalg.lstsq(X[i], gap[i], rcond=None)[0][1]))
+            if len(boot) == n_boot:
+                break
+    else:
+        return fail
     return {
-        "coef_corner": round(float(beta[1]), 4),
-        "coef_width": round(float(beta[2]), 4),
+        "estimable": True,
+        "coef_corner": float(beta[1]),
+        "coef_width": float(beta[2]),
         "ci": _ci(boot),
         "p": float(np.mean(np.array(boot) <= 0)),
     }
 
 
 def median_difference(a, b, n_boot: int = N_BOOT, seed: int = 0) -> dict:
+    if not a or not b:
+        return {"n": [len(a), len(b)], "medians": None, "difference": None, "ci": None}
     rng = np.random.default_rng(seed)
     boot = [
         float(np.median(rng.choice(a, len(a))) - np.median(rng.choice(b, len(b))))
@@ -134,7 +158,7 @@ def median_difference(a, b, n_boot: int = N_BOOT, seed: int = 0) -> dict:
 
 def h1(rows: list[dict], n_boot: int = N_BOOT, seed: int = 0) -> dict:
     """Crisscross gap vs. door class: primary (pooled, adjusted for width) and secondary."""
-    pts = [(r, d) for r, d in valid_pairs(rows) if family(d["name"]) == "crisscross"]
+    pts = [(r, d) for r, d in gap_pairs(rows) if family(d["name"]) == "crisscross"]
     corner = [is_corner(r["room"]) for r, _ in pts]
     width = [r["room"]["w"] for r, _ in pts]
 
@@ -149,8 +173,14 @@ def h1(rows: list[dict], n_boot: int = N_BOOT, seed: int = 0) -> dict:
         b = [g for g, f in zip(pooled, flag, strict=True) if not f]
         return median_difference(a, b, n_boot, seed)
 
+    def span(flag: bool) -> list[float] | None:
+        w = [v for v, c in zip(width, corner, strict=True) if c == flag]
+        return [min(w), max(w)] if w else None
+
     return {
         "n_rooms": len(pts),
+        "n_corner_fed": sum(corner),
+        "width_range": {"corner_fed": span(True), "centre_fed": span(False)},
         "primary": fit(pooled),
         "by_method": {m: fit([d["gap_by_method"][m] for _, d in pts]) for m in METHODS},
         "unadjusted": split(corner),
@@ -159,22 +189,30 @@ def h1(rows: list[dict], n_boot: int = N_BOOT, seed: int = 0) -> dict:
 
 
 def h2(rows: list[dict]) -> dict:
-    """Crisscross vs. buttonhook per room, within families, over rooms where both are valid."""
+    """Crisscross vs. buttonhook per room, only in rooms where both are valid.
+
+    The sign test excludes ties; the share uses all rooms where both are valid."""
 
     def count(sel: list[dict]) -> dict:
-        wins = losses = 0
+        wins = losses = ties = invalid = 0
         for r in sel:
             x = {family(d["name"]): d for d in r["doctrines"] if d["feasible"]}
             if "crisscross" in x and "buttonhook" in x:
-                a, b = x["crisscross"]["risk_multi"], x["buttonhook"]["risk_multi"]
+                a, b = risk(x["crisscross"]), risk(x["buttonhook"])
                 wins += a < b
                 losses += a > b
-        n = wins + losses
+                ties += a == b
+            else:
+                invalid += 1
+        both = wins + losses + ties
         return {
             "wins": wins,
-            "n": n,
-            "share": round(wins / n, 4) if n else None,
-            "p": sign_test(wins, n),
+            "losses": losses,
+            "ties": ties,
+            "both_valid": both,
+            "not_both_valid": invalid,
+            "share": wins / both if both else None,
+            "p": sign_test(wins, wins + losses),
         }
 
     return {
@@ -184,28 +222,23 @@ def h2(rows: list[dict]) -> dict:
     }
 
 
-def reliability(rows: list[dict], seed: int = 1) -> dict:
+def reliability(rows: list[dict]) -> dict:
     """Descriptive reliability measures of section 4; none of them filters anything."""
-    pairs = valid_pairs(rows)
-    floor = [(r, d) for r, d in pairs if at_time_floor(r, d)]
+    pairs = gap_pairs(rows)
     active = [d for _, d in pairs if d["seeds_leaving"] > 0]
     runs = [g for d in active for g in d["gap_per_seed"]]
-    rng = np.random.default_rng(seed)
-    within = []
-    for d in active:  # proxy: how often would two halves of interchangeable runs agree?
-        g = np.array(d["gap_per_seed"])
-        h = len(g) // 2
-        cuts = [rng.permutation(len(g)) for _ in range(200)]
-        within.append(np.mean([abs(g[i[:h]].max() - g[i[h:]].max()) <= 0.05 for i in cuts]))
 
     def stable(sel: list[dict]) -> list[int]:
-        return [sum(d["method_stable"] for d in sel), len(sel)]
+        return [sum(bool(d["method_stable"]) for d in sel), len(sel)]
 
     def best_of(k: int) -> float:
         per = [np.mean([max(c) for c in combinations(d["gap_per_seed"], k)]) for d in active]
-        return round(float(np.mean(per)), 4)
+        return float(np.mean(per))
 
+    with_valid = [[d for d in r["doctrines"] if d["feasible"]] for r in rows]
+    with_valid = [x for x in with_valid if x]
     n_runs = len(active[0]["gap_per_seed"]) if active else 0
+    spread = [max(d["gap_per_seed"]) - min(d["gap_per_seed"]) for d in active]
     return {
         "method_stable": stable([d for _, d in pairs]),
         "method_stable_by_family": {
@@ -213,23 +246,21 @@ def reliability(rows: list[dict], seed: int = 1) -> dict:
         },
         "method_stable_corner_fed": stable([d for r, d in pairs if is_corner(r["room"])]),
         "method_stable_centre_fed": stable([d for r, d in pairs if not is_corner(r["room"])]),
-        "rooms_all_stable": sum(
-            all(d["method_stable"] for d in r["doctrines"] if d["feasible"]) for r in rows
-        ),
-        "interchangeable_proxy": round(float(np.mean(within)), 2) if within else None,
-        "time_floor": [[r["room"]["name"], d["name"]] for r, d in floor],
+        "rooms_all_stable": [
+            sum(all(d["method_stable"] for d in x) for x in with_valid),
+            len(with_valid),
+        ],
+        "no_improvement": [
+            [r["room"]["name"], d["name"]] for r, d in pairs if no_improvement(r, d)
+        ],
         "runs_at_playbook": [sum(g < 0.005 for g in runs), len(runs)],
-        "median_run_spread": round(
-            float(np.median([max(d["gap_per_seed"]) - min(d["gap_per_seed"]) for d in active])), 4
-        )
-        if active
-        else None,
+        "median_run_spread": float(np.median(spread)) if spread else None,
         "best_of_k": {k: best_of(k) for k in (1, 5, n_runs) if 0 < k <= n_runs},
     }
 
 
 def gaps(rows: list[dict]) -> dict:
-    pairs = valid_pairs(rows)
+    pairs = gap_pairs(rows)
 
     def summary(sel: list[dict]) -> dict:
         x = [d["gap_selected"] for d in sel]
@@ -238,8 +269,8 @@ def gaps(rows: list[dict]) -> dict:
             return {"n": 0}
         return {
             "n": len(x),
-            "median": round(float(np.median(x)), 4),
-            "mean": round(float(np.mean(x)), 4),
+            "median": float(np.median(x)),
+            "mean": float(np.mean(x)),
             "min": min(x),
             "max": max(x),
             "with_fratricide": fr,
@@ -251,20 +282,16 @@ def gaps(rows: list[dict]) -> dict:
     }
 
 
-def analyze(
-    rows: list[dict], n_boot: int = N_BOOT, seed: int = 0, h4_p: float | None = None
-) -> dict:
-    """All results of the plan. Holm runs over H1, H2 and H4; without H4 it is provisional."""
+def analyze(rows: list[dict], n_boot: int = N_BOOT, seed: int = 0) -> dict:
+    """All results of the plan. H1 and H2 are the whole test family of the Holm step."""
     r1, r2 = h1(rows, n_boot, seed), h2(rows)
-    pvals = {"H1": r1["primary"]["p"], "H2": r2["p"]}
-    if h4_p is not None:
-        pvals["H4"] = h4_p
-    adj = holm(pvals)
+    adj = holm({"H1": r1["primary"]["p"], "H2": r2["p"]})
     pairs = [(r, d) for r in rows for d in r["doctrines"]]
     return {
         "n_rooms": len(rows),
         "pairs": len(pairs),
         "valid_pairs": len(valid_pairs(rows)),
+        "undefined_gaps": len(valid_pairs(rows)) - len(gap_pairs(rows)),
         "rooms_with_step": sum(
             any("dead-space" in d["name"] for d in r["doctrines"]) for r in rows
         ),
@@ -279,29 +306,32 @@ def analyze(
             "p_holm": adj["H2"],
             "supported": adj["H2"] < ALPHA and (r2["share"] or 0) >= H2_MIN_SHARE,
         },
-        "holm_final": h4_p is not None,
     }
 
 
 def text(a: dict) -> str:
     """Short readable summary of `analyze`."""
     r, p, q = a["reliability"], a["H1"]["primary"], a["H2"]
-    stable = r["method_stable"]
-    lines = [
-        f"rooms {a['n_rooms']}, valid pairs {a['valid_pairs']}/{a['pairs']}, "
-        f"with dead-space step {a['rooms_with_step']}",
-        f"gap: median {a['gaps']['all']['median'] * 100:.1f} %",
-        f"method-stable {stable[0]}/{stable[1]}, rooms all stable {r['rooms_all_stable']}, "
-        f"proxy {r['interchangeable_proxy']}, time floor {len(r['time_floor'])}",
+    stable, rooms = r["method_stable"], r["rooms_all_stable"]
+    h1_line = (
         f"H1 corner-fed {p['coef_corner'] * 100:+.1f} points, CI "
         f"[{p['ci'][0] * 100:.1f}, {p['ci'][1] * 100:.1f}], p {p['p']:.4f}, "
-        f"Holm {a['H1']['p_holm']:.4f}, supported {a['H1']['supported']}",
-        f"H2 {q['wins']}/{q['n']} ({q['share']}), p {q['p']:.4f}, Holm {q['p_holm']:.4f}, "
-        f"supported {q['supported']}",
-    ]
-    if not a["holm_final"]:
-        lines.append("Holm is provisional: H4 is missing")
-    return "\n".join(lines)
+        if p["estimable"]
+        else "H1 not estimable, "
+    )
+    return "\n".join(
+        [
+            f"rooms {a['n_rooms']}, valid pairs {a['valid_pairs']}/{a['pairs']}, "
+            f"with dead-space step {a['rooms_with_step']}",
+            f"gap: median {a['gaps']['all'].get('median', 0) * 100:.1f} %",
+            f"method-stable {stable[0]}/{stable[1]}, rooms all stable {rooms[0]}/{rooms[1]}, "
+            f"no improvement at the fastest time {len(r['no_improvement'])}",
+            h1_line + f"Holm {a['H1']['p_holm']:.4f}, supported {a['H1']['supported']}",
+            f"H2 {q['wins']}/{q['both_valid']} ({q['share']}), ties {q['ties']}, "
+            f"not both valid {q['not_both_valid']}, p {q['p']:.4f}, Holm {q['p_holm']:.4f}, "
+            f"supported {q['supported']}",
+        ]
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -314,11 +344,10 @@ def main(argv: list[str] | None = None) -> None:
         metavar=("SEED", "N"),
         help="require exactly the rooms of generated_rooms(SEED, N)",
     )
-    ap.add_argument("--h4-p", type=float, help="one-sided p of H4 for the Holm step")
     ap.add_argument("--out", type=Path, help="write the full result as JSON")
     a = ap.parse_args(argv)
     rows = load_rooms(a.files)
-    out = analyze(rows, h4_p=a.h4_p)
+    out = analyze(rows)
     if a.generated:
         out["rooms_digest"] = check_rooms(rows, *a.generated)
     print(text(out))

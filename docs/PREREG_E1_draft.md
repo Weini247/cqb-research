@@ -124,6 +124,22 @@ Abstract duel model with freely chosen rates (only relative results are meaningf
 adversary movement, no doors that open, constant speeds, idealized perception, single-room
 scope, stylized playbooks.
 
+## 8. Pre-freeze checks (rules fixed before measuring)
+
+Both checks run on development rooms only (`killhouse/prefreeze.py`), and their rules were
+committed before the measurement.
+
+- **Evaluation scenarios:** independent samples of 32 scenarios give the Monte-Carlo standard error
+  of held-out estimates. The number of evaluation scenarios is the smallest of 32, 64, 128, 256
+  and 512 with a standard error of the relative gap of at most 2 points in the median pair and
+  3 points at the 90th percentile, and of a paired risk difference between two techniques of
+  at most 0.01 in the median room. If none qualifies, 512 is used and the shortfall is reported.
+  Planning scenarios are part of the search procedure and are judged separately. The count is
+  never changed on the basis of confirmatory results.
+- **H1 test calibration:** with a true door effect of 0, on the rehearsal room design, the test must
+  reject at nominal one-sided 0.05 in at most 6 % of simulations. If it does not, H1 uses a
+  residual permutation test (Freedman-Lane) instead of the bootstrap p-value.
+
 ## Open before the freeze
 
 - External review of this draft. The header names an SME review; no real instructor is available

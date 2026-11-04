@@ -5,7 +5,6 @@ import pytest
 
 from killhouse.analysis import (
     analyze,
-    at_time_floor,
     check_rooms,
     corner_coefficient,
     family,
@@ -14,6 +13,7 @@ from killhouse.analysis import (
     is_corner,
     load_rooms,
     main,
+    no_improvement,
     sign_test,
 )
 from killhouse.room import generated_rooms
@@ -104,24 +104,58 @@ def test_h2_compares_families_and_skips_rooms_without_both():
         room("R8", 7.0, [3.0, 4.0], [pair("crisscross"), pair("buttonhook", feasible=False)])
     )
     r = h2(rows)
-    assert (r["wins"], r["n"]) == (7, 8)
-    assert r["corner_fed"]["n"] + r["centre_fed"]["n"] == 8
+    assert (r["wins"], r["both_valid"], r["not_both_valid"]) == (7, 8, 1)
+    assert r["corner_fed"]["both_valid"] + r["centre_fed"]["both_valid"] == 8
 
 
-def test_time_floor_needs_no_leaving_run_and_the_fastest_time():
+def test_no_improvement_needs_no_leaving_run_and_the_fastest_time():
     r = rooms()[0]
-    assert at_time_floor(r, pair("x", t=0.9, leaving=0))
-    assert not at_time_floor(r, pair("x", t=1.6, leaving=0))
-    assert not at_time_floor(r, pair("x", t=0.9, leaving=3))
+    assert no_improvement(r, pair("x", t=0.9, leaving=0))
+    assert not no_improvement(r, pair("x", t=1.6, leaving=0))
+    assert not no_improvement(r, pair("x", t=0.9, leaving=3))
 
 
-def test_analyze_holm_is_provisional_without_h4():
+def test_h2_share_counts_ties_but_the_sign_test_does_not():
+    rows = rooms()
+    for r in rows[:2]:
+        r["doctrines"][1]["risk_multi"] = 0.5  # tie with crisscross
+    q = h2(rows)
+    assert (q["wins"], q["losses"], q["ties"], q["both_valid"]) == (6, 0, 2, 8)
+    assert q["share"] == 0.75 and q["p"] == sign_test(6, 6)
+
+
+def test_h2_uses_unrounded_risks_when_present():
+    rows = rooms()[1:2]
+    rows[0]["doctrines"][0].update(risk_multi=0.5, risk_exact=0.50001)
+    rows[0]["doctrines"][1].update(risk_multi=0.5, risk_exact=0.50002)
+    assert h2(rows)["wins"] == 1
+
+
+def test_corner_coefficient_reports_when_it_cannot_be_estimated():
+    one_class = corner_coefficient([0.1, 0.2, 0.3, 0.4, 0.5], [1] * 5, [3, 4, 5, 6, 7], n_boot=10)
+    assert one_class["estimable"] is False and one_class["p"] == 1.0
+
+
+def test_analyze_family_is_h1_and_h2_only():
     a = analyze(rooms(), n_boot=100)
-    assert a["n_rooms"] == 8 and a["valid_pairs"] == 16 and not a["holm_final"]
+    assert a["n_rooms"] == 8 and a["valid_pairs"] == 16 and a["undefined_gaps"] == 0
     assert a["rooms_with_step"] == 8
     assert a["gaps"]["pie+crisscross"] == {"n": 0}  # no valid pair of this family
-    b = analyze(rooms(), n_boot=100, h4_p=0.5)
-    assert b["holm_final"] and b["H2"]["p_holm"] >= a["H2"]["p_holm"]
+    assert "H4" not in a and a["H1"]["p_holm"] >= a["H1"]["primary"]["p"]
+
+
+def test_rooms_without_a_valid_technique_do_not_count_as_stable():
+    rows = rooms()
+    rows.append(room("R8", 7.0, [3.0, 4.0], [pair("crisscross", feasible=False)]))
+    assert analyze(rows, n_boot=50)["reliability"]["rooms_all_stable"] == [8, 8]
+
+
+def test_an_undefined_gap_stays_counted_but_out_of_the_gap_statistics():
+    rows = rooms()
+    rows[0]["doctrines"][0]["gap_selected"] = None
+    a = analyze(rows, n_boot=50)
+    assert a["valid_pairs"] == 16 and a["undefined_gaps"] == 1
+    assert a["gaps"]["crisscross"]["n"] == 7 and a["H1"]["n_rooms"] == 7
 
 
 def test_load_rooms_accepts_equal_repeats_and_rejects_conflicts(tmp_path):
@@ -147,5 +181,5 @@ def test_cli_writes_the_result(tmp_path, capsys):
     f = tmp_path / "rooms.jsonl"
     f.write_text("\n".join(json.dumps(r) for r in rooms()), encoding="utf-8")
     main([str(f), "--out", str(tmp_path / "a.json")])
-    assert "provisional" in capsys.readouterr().out
+    assert "H2 7/8" in capsys.readouterr().out
     assert json.loads((tmp_path / "a.json").read_text(encoding="utf-8"))["n_rooms"] == 8
