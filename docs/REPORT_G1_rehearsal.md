@@ -64,9 +64,14 @@ are similar with and without it (means 28 % and 31 %).
 | H1 as drafted (door centre <= 1.6 m from a side wall) | 33.9 % (n = 21) vs. 24.6 % (n = 12), difference 9.3 points, CI [2.5, 22.2] |
 | H1, CEM alone / CMA-ES alone | 9.2, CI [2.1, 21.1] / 7.3, CI [-0.6, 21.2] |
 | H1, door in the outer third of the wall instead | 8.8 points, CI [-1.5, 18.5] |
-| H1 adjusted for room width | corner-fed +5.8 points, CI [1.1, 11.2]; width -3.2 points per metre |
-| H2 crisscross < buttonhook | 25 of 33 rooms (76 %), one-sided p = 0.002; 7 of 8 losses are corner-fed |
+| H1 adjusted for room width | corner-fed +5.8 points, CI [1.0, 11.3], one-sided p = 0.007; width -3.2 points per metre |
+| H1 adjusted, CEM alone / CMA-ES alone | +6.1, CI [-0.1, 14.2], p = 0.027 / +4.8, CI [-1.6, 11.3], p = 0.063 |
+| H2 crisscross < buttonhook | 25 of 33 rooms (76 %), one-sided p = 0.002; corner-fed 14 of 21 (67 %), centre-fed 11 of 12 (92 %) |
 | H3, H4 | not covered: this run does not produce the data |
+
+All numbers of the adjusted rows come from `killhouse-analyze` on the two result files; it
+confirms that they hold exactly `generated_rooms(1, 40)`. The adjusted H1 passes on the pooled gap
+but neither optimizer family alone has a CI above 0, so it is a weak effect at this sample size.
 
 After 30 rooms H1 looked much stronger (14 points). The last 10 rooms reduced it, which shows how
 unstable a median difference over 12 rooms is. The gap falls with room width (r = -0.68) about as
@@ -85,5 +90,4 @@ definition.
 ## Consequences
 
 The changes are in PREREG_E1_draft.md (change log 2026-11-04). The draft is **not frozen**. Still
-open before the freeze: a review, a versioned analysis script, and a decision on how H3 and H4
-get their data.
+open before the freeze: a review, and a decision on how H3 and H4 get their data.

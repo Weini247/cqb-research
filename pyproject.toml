@@ -14,6 +14,7 @@ killhouse-sens = "killhouse.sensitivity:main"
 killhouse-3d = "killhouse.viewer3d:main"
 killhouse-apartment = "killhouse.clearing:main"
 killhouse-tactics = "killhouse.tactics:main"
+killhouse-analyze = "killhouse.analysis:main"
 
 [dependency-groups]
 dev = [

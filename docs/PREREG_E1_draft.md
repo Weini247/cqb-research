@@ -89,10 +89,14 @@ technique. Validity does not depend on it (§2).
 
 | | hypothesis | test | supported if |
 |---|---|---|---|
-| H1 | At equal room width, the crisscross gap is larger in corner-fed rooms (door centre <= 1.6 m from a side wall) than in centre-fed rooms. | least-squares regression gap ~ corner-fed + room width over valid rooms, bootstrap 95 % CI of the corner-fed coefficient over rooms (10 000 resamples) | CI lies above 0 |
-| H2 | Crisscross has lower `risk_multi` than buttonhook. | sign test over valid rooms, one-sided | p < 0.05 and >= 70 % of rooms |
+| H1 | At equal room width, the crisscross gap is larger in corner-fed rooms (door centre <= 1.6 m from a side wall) than in centre-fed rooms. | least-squares regression gap ~ corner-fed + room width over valid rooms, bootstrap over rooms (10 000 resamples); p = share of resamples with a coefficient <= 0 (one-sided); the 95 % CI is reported | Holm-adjusted p < 0.05 |
+| H2 | Crisscross has lower `risk_multi` than buttonhook. | sign test over rooms where both are valid, one-sided | Holm-adjusted p < 0.05 and >= 70 % of rooms |
 | H3 | The ranking of the four playbooks is robust to the model axes in `sensitivity.py`. | mean Kendall tau per variant vs. baseline | tau >= 0.8 in >= 80 % of variants |
-| H4 | A four-operator entry has lower `risk_multi` than the same plan with #3/#4 outside, in rooms >= 4.5 m wide. | per room, the mean difference over playbooks; sign test over **rooms** (rooms are the independent unit, not room x playbook) | p < 0.05 |
+| H4 | A four-operator entry has lower `risk_multi` than the same plan with #3/#4 outside, in rooms >= 4.5 m wide. | per room, the mean difference over playbooks; sign test over **rooms** (rooms are the independent unit, not room x playbook) | Holm-adjusted p < 0.05 |
+
+**Analysis code:** §4 and §5 are implemented in `killhouse/analysis.py`
+(`killhouse-analyze <result files> --generated 2026 40 --h4-p <p>`), which also checks that the
+files hold exactly the confirmatory rooms.
 
 **Multiple testing:** H1, H2 and H4 form one family and are Holm-corrected at alpha = 0.05.
 H3 is a descriptive robustness criterion without a p-value. Rooms are the independent unit
@@ -124,14 +128,17 @@ scope, stylized playbooks.
 
 - External review of this draft. The header names an SME review; no real instructor is available
   so far, so it has to be decided what replaces it.
-- A versioned analysis script that computes §4 and §5 from the result files.
 - H3 and H4 need data that `killhouse-bench` does not produce: H3 a sensitivity run, H4 a
-  comparison with #3/#4 outside. Their room set, budget and script have to be fixed.
+  comparison with #3/#4 outside. Their room set, budget and script have to be fixed. Until then
+  `killhouse-analyze` reports its Holm step as provisional.
 - The expected number of valid rooms is low for technique comparisons: the crossing techniques
   were invalid in 7 of 40 rehearsal rooms, mostly through collisions.
 
 ## Change log
 
+- 2026-11-04: analysis script `killhouse/analysis.py` added. Writing it showed that the H1 rule
+  ("CI excludes 0") could not enter the Holm step, so H1 now has a bootstrap p-value and H1, H2
+  and H4 all decide on Holm-adjusted p.
 - 2026-11-04: dress rehearsal on `generated_rooms(1, 40)` (REPORT_G1_rehearsal.md): H1 now
   adjusted for room width, because the gap depends on width as strongly as on door distance;
   technique families defined; method stability declared descriptive; time-floor category and
