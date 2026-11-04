@@ -44,7 +44,8 @@ would be separate research with its own tasks and evidence.
 
 1. ✅ M2a Referenzfälle mit bekannter Lösung · ✅ M2b Seed-Streuung und Sättigung
    ([REPORT_M2](REPORT_M2.md)); ✅ Schätzer mit gepoolten Archiven; ✅ Gegenprobe mit CMA-ES
-   (M2c); offen: Analyseplan einfrieren
+   (M2c); ✅ Generalprobe auf 40 Räumen ([REPORT_G1_rehearsal](REPORT_G1_rehearsal.md)); offen:
+   Review, Analyse-Skript, Daten für H3/H4, dann Analyseplan einfrieren
 2. Schnittstelle für Planungsverfahren und Aufgabenspezifikation; klassische Vergleichsverfahren
    (zufällige Suche, gierige Sichtabdeckung, Watchman-Route)
 3. Fehlerdiagnose pro Durchlauf (ungesehener Bereich, Kollision, späte Identifikation, ...)

@@ -53,6 +53,7 @@ python -m uv run killhouse-apartment --seeds 5 --out out/apartment         # apa
 | [PARAMETERS](docs/PARAMETERS.md) | provenance of every model parameter (empirical / geometric / free) |
 | [PREREG_E1_draft](docs/PREREG_E1_draft.md) | draft preregistration (not frozen) |
 | [REPORT_M2](docs/REPORT_M2.md) | method check: reference cases with known solutions, seed x budget saturation |
+| [REPORT_G1_rehearsal](docs/REPORT_G1_rehearsal.md) | dress rehearsal of the planned study on 40 development rooms |
 | [RUNLOG](docs/RUNLOG.md) | which results were known at which model state |
 | [REVIEW_R1](docs/REVIEW_R1.md), [R2](docs/REVIEW_R2.md), [R3](docs/REVIEW_R3.md) | AI-assisted methodological reviews and responses |
 | [ROADMAP](docs/ROADMAP.md) | stages and milestones |

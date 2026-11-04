@@ -5,6 +5,10 @@ code and the optimizer reproduce known answers, and measure how much a gap depen
 optimizer seed and budget. Code: `src/killhouse/reference.py` (M2a, commit ee64dc1),
 `src/killhouse/saturation.py` (M2b, commit b1ca549). Status: exploratory, development rooms only.
 
+**Update (REPORT_G1_rehearsal.md):** the patterns below come from three rooms. On 40 generated
+rooms, "corner-fed stable, centre-fed bimodal" does not hold in general, and the measured cost
+of the full protocol is 5-7 h, not the estimates given here.
+
 ## M2a: reference cases with known solutions
 
 | case | known answer | result |
@@ -155,7 +159,7 @@ the L-corridor watchman optimum is found in 17/20 seeds (CEM with immigrants 20/
 
 - Run **both optimizer families** (CEM and CMA-ES, 5 seeds each, 60x64x4) and pool all ten
   archives; select one candidate per technique on planning scenarios from the pooled archive.
-  Cost about 13 h for 40 rooms on the current GPU.
+  Measured cost in the rehearsal: about 4.9 h for 40 rooms (the 13 h estimated here was too high).
 - **Agreement instead of the 2 % seed rule:** a room-technique pair is "method-stable" when the
   two single-method pooled gaps differ by at most 5 points. Pairs that are not are kept and
   reported as lower bounds; the share of method-stable pairs is itself a reported outcome.

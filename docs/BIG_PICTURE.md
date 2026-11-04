@@ -69,10 +69,10 @@ preprint(s), later possibly a thesis.
    per doctrine and scored on held-out scenarios, gaps are 1-54 % at the full budget, but two
    optimizer seeds differ by up to 20 points (M-center crisscross 20 % vs. 0 %). The earlier
    "0 % for centre-fed doors" came from too small a budget. Gaps are lower bounds on attainable
-   improvement in the model, not stable effect sizes. The method check M2 (REPORT_M2) refines
-   this: for the corner-fed door the gaps are saturated and seed-stable (spread 1-4 points);
-   for centre-fed doors the seeds split into "stays at the technique" (0 %) and "finds a
-   15-30 % better strategy", even at the largest budget.
+   improvement in the model, not stable effect sizes. On 40 generated rooms
+   (REPORT_G1_rehearsal) the pooled gaps have a median of 29 % (0-56 %), and two optimizer
+   families agree within 5 points in 57 % of room-technique pairs. The pattern from three rooms
+   in REPORT_M2 (corner-fed stable, centre-fed bimodal) does not generalize.
 3. **Apartments may reverse the ranking (low reliability):** limited penetration with the
    dead-space step had the lowest risk in 3 development apartments. In APT1 it did not fully
    clear one room, the comparison population is small, and the hallway explanation is not
