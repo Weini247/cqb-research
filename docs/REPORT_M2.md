@@ -7,7 +7,8 @@ optimizer seed and budget. Code: `src/killhouse/reference.py` (M2a, commit ee64d
 
 **Update (REPORT_G1_rehearsal.md):** the patterns below come from three rooms. On 40 generated
 rooms, "corner-fed stable, centre-fed bimodal" does not hold in general, and the measured cost
-of the full protocol is 5-7 h, not the estimates given here.
+of the full protocol is 5-7 h, not the estimates given here. Review R4 also rejected the term
+"lower bound" for gaps used below: they are Monte-Carlo estimates for a fixed search budget.
 
 ## M2a: reference cases with known solutions
 

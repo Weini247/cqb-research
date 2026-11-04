@@ -1,5 +1,6 @@
 import pytest
 
+from killhouse.entry import E1_CFG, EVAL_CFG, threat_sets
 from killhouse.prefreeze import (
     calibration,
     candidate,
@@ -7,6 +8,7 @@ from killhouse.prefreeze import (
     scenario_table,
     smallest_sufficient,
 )
+from killhouse.room import generated_rooms
 
 
 def test_scenario_table_scales_with_the_square_root_of_the_count():
@@ -50,6 +52,12 @@ def test_calibration_reports_a_rate_for_the_null_model():
     ]
     c = calibration(rows, n_sim=20, n_boot=50)
     assert 0 <= c["rate_at_0.05"] <= 1 and c["n_rooms"] == 20
+
+
+def test_e1_scenarios_extend_the_held_out_ones():
+    room = generated_rooms(1, 1)[0]
+    small, large = threat_sets(room, 200, EVAL_CFG), threat_sets(room, 200, E1_CFG)
+    assert large.shape[0] == 128 and (large[:32] == small).all()
 
 
 def test_confirmatory_rooms_are_refused(tmp_path):

@@ -1,8 +1,9 @@
 # Preregistration draft: E1 (NOT FROZEN)
 
-Status: **draft**. It will be frozen (git tag + upload to a registry such as OSF) only after the
-SME review ([SME_REVIEW.md](SME_REVIEW.md)) has been incorporated. Until then, everything below
-may change. Changes are logged in the change log at the end.
+Status: **draft**. It will be frozen (git tag + upload to a registry such as OSF) after the
+documented method and source check (reviews R1-R4, [TACTICS.md](TACTICS.md)). No instructor or
+other subject-matter expert has reviewed it. Until the freeze, everything below may change.
+Changes are logged in the change log at the end.
 
 ## 0. Scope and validity limits
 
@@ -13,7 +14,8 @@ Optimization results hold only within the defined simulation environment, constr
 objectives. No superiority of real police or military procedures is inferred from them.
 Transfer to human teams needs separate empirical calibration and independent expert
 validation. All changes to parameters, hypotheses and conditions are versioned before the
-registration is frozen.
+registration is frozen. Checked are the implementation, internal consistency and individually
+documented source references. Practical validity and real-world rankings are not claimed.
 
 **Information model:** All strategies know the floorplan, no strategy knows threat positions
 (see [PARAMETERS.md](PARAMETERS.md)). Optimization uses planning scenarios; every confirmatory
@@ -31,13 +33,13 @@ the size of the gap?
 ## 2. Model (frozen at tag `e1-prereg`)
 
 - Code: this repository at the tag. Model constants in `killhouse/entry.py` (`DT`, `HORIZON`,
-  `DEFAULT_CFG`), the team in `killhouse/team.py`, playbooks in `killhouse/doctrine.py` after
-  the SME revision.
+  `DEFAULT_CFG`), the team in `killhouse/team.py`, playbooks in `killhouse/doctrine.py`.
 - Primary outcome: `risk_multi`, the probability that the team is hit with `n_threats = 2`
-  hidden threats at random positions (32 fixed scenarios per room, common random numbers),
-  one target per operator.
+  hidden threats at random positions (fixed scenarios per room, common random numbers), one
+  target per operator. 32 planning scenarios, 128 evaluation scenarios (`E1_CFG`, see §8).
 - Secondary outcomes: `risk` (single threat), `t_clear`, `fratricide`, `exposure`.
 - Validity: collision and wall < 0.02, room cleared (<= 0.5 % unseen threat positions within 12 s).
+  Validity means geometric and temporal admissibility, not a safety assessment.
 
 ## 3. Geometries
 
@@ -60,6 +62,13 @@ archives of all 10 runs** per room (`killhouse-bench --optimizer cem cmaes --see
 threat scenarios for **one candidate per technique that was selected on planning scenarios
 from the pooled archive** (lowest planning risk at equal-or-better time and fratricide). The
 optimistic best-of-front value is reported only as secondary. Tests use rooms as the unit.
+
+**Estimand:** the gap measures the performance of this fixed search procedure including its
+selection step, not a global optimality gap. The relative gap is a Monte-Carlo estimate for the
+fixed search budget, not a guaranteed lower bound. Negative values are kept. If the held-out risk
+of a technique is 0, its relative gap is undefined: the pair stays counted, is reported, and is
+left out of the gap statistics. Calculations and tests use unrounded values.
+
 Expected compute: 5-7 h for 40 rooms (measured in the dress rehearsal).
 
 **Technique families:** "technique" means one of the four families crisscross, buttonhook,
@@ -70,17 +79,16 @@ or not the step was added, and the number of rooms with the step is reported.
 
 **Reliability (judged across runs, not within a run):** a room-technique pair is
 **method-stable** when the pooled gaps of the two optimizer families, each computed on its own
-five archives, differ by at most 5 points (`METHOD_TOL`). This measure is **descriptive and never
-a filter**: all valid pairs stay in every analysis, and all gaps are lower bounds. Its share is
-reported next to the rehearsal values (57 % observed, about 78 % for interchangeable methods by
-the proxy in REPORT_G1_rehearsal.md). Per pair, the per-run gaps and the number of runs that
-leave the seeded playbook are reported as well. H1 is repeated for each optimizer family alone;
-a result that holds for one family only is reported as such.
+five archives, differ by at most 5 points (`METHOD_TOL`). The limit is a descriptive convention
+without a reference value. This measure **never filters**: all valid pairs stay in every
+analysis. Per pair, the per-run gaps and the number of runs that leave the seeded playbook are
+reported as well. H1 is repeated for each optimizer family alone; a result that holds for one
+family only is reported as such.
 
-**Time floor:** a pair where no run leaves the playbook and the playbook's `t_clear` equals the
-fastest time in the pooled front has no room under the "equal or better time" rule. These pairs
-stay in the analyses and are also counted and reported as a separate category, not as search
-failures.
+**No improvement found:** pairs where no run leaves the playbook and the playbook's `t_clear`
+equals the fastest time in the pooled front stay in the analyses and are also counted separately.
+Under the fixed search budget no improvement above the fixed threshold was found; search failure
+is not excluded.
 
 **Fratricide:** every gap and every ranking is reported together with the `fratricide` of the
 technique. Validity does not depend on it (§2).
@@ -89,30 +97,37 @@ technique. Validity does not depend on it (§2).
 
 | | hypothesis | test | supported if |
 |---|---|---|---|
-| H1 | At equal room width, the crisscross gap is larger in corner-fed rooms (door centre <= 1.6 m from a side wall) than in centre-fed rooms. | least-squares regression gap ~ corner-fed + room width over valid rooms, bootstrap over rooms (10 000 resamples); p = share of resamples with a coefficient <= 0 (one-sided); the 95 % CI is reported | Holm-adjusted p < 0.05 |
-| H2 | Crisscross has lower `risk_multi` than buttonhook. | sign test over rooms where both are valid, one-sided | Holm-adjusted p < 0.05 and >= 70 % of rooms |
-| H3 | The ranking of the four playbooks is robust to the model axes in `sensitivity.py`. | mean Kendall tau per variant vs. baseline | tau >= 0.8 in >= 80 % of variants |
-| H4 | A four-operator entry has lower `risk_multi` than the same plan with #3/#4 outside, in rooms >= 4.5 m wide. | per room, the mean difference over playbooks; sign test over **rooms** (rooms are the independent unit, not room x playbook) | Holm-adjusted p < 0.05 |
+| H1 | Within valid rooms, at equal room width, the crisscross gap is larger in corner-fed rooms (door centre <= 1.6 m from a side wall) than in centre-fed rooms. | least-squares regression gap ~ corner-fed + room width over valid rooms, bootstrap over rooms (10 000 resamples); p = share of resamples with a coefficient <= 0 (one-sided); the 95 % CI is reported | Holm-adjusted p < 0.05 |
+| H2 | In rooms where both are valid, crisscross has lower `risk_multi` than buttonhook. | sign test, one-sided, ties excluded | Holm-adjusted p < 0.05 and wins in >= 70 % of all rooms where both are valid (ties in the denominator) |
 
 **Analysis code:** §4 and §5 are implemented in `killhouse/analysis.py`
-(`killhouse-analyze <result files> --generated 2026 40 --h4-p <p>`), which also checks that the
-files hold exactly the confirmatory rooms.
+(`killhouse-analyze <result files> --generated 2026 40`), which also checks that the files hold
+exactly the confirmatory rooms.
 
-**Multiple testing:** H1, H2 and H4 form one family and are Holm-corrected at alpha = 0.05.
-H3 is a descriptive robustness criterion without a p-value. Rooms are the independent unit
-in every test, and seeds are combined within a room first (pooled archive, see §4).
+**Multiple testing:** E1 consists of H1 and H2 only. Both form the Holm family at alpha = 0.05.
+The former H3 (robustness over model axes) and H4 (four vs. two operators) are preregistered
+separately, as studies with their own data collection and analysis plan, and are never added to
+this family. Rooms are the independent unit in every test, and seeds are combined within a room
+first (pooled archive, see §4).
+
+**H1 reading and failure rules:** H1 tests a linearly width-adjusted association within valid
+rooms, not a causal door effect. The width range of both door classes is reported. If one door
+class is missing, the design has rank < 3, or the bootstrap cannot draw enough usable resamples
+(limit 20 x 10 000), H1 counts as not estimable and not supported. The specification of H1 was
+chosen on the rehearsal rooms, so those rooms are development data; only E1 can confirm it.
 
 Secondary for H1, without a decision rule: the unadjusted difference of median gaps and the
 relative definition (door centre in the outer third of the wall). H2 is reported separately for
 corner-fed and centre-fed rooms, also without a decision rule.
 
-All four hypotheses are reported regardless of outcome. Exploratory analyses (for example,
+Both hypotheses are reported regardless of outcome. Exploratory analyses (for example,
 descriptions of the best found strategies) are labelled as such.
 
 ## 6. Exclusions and deviations
 
 - A room counts for a technique only if that technique is valid there. Invalid techniques are
-  reported as such, not dropped silently.
+  reported as such, not dropped silently. H2 therefore speaks only about rooms where both
+  techniques are valid. The numbers of invalid rooms and of ties are reported separately.
 - No room is excluded after seeing the results. If the generator yields a degenerate room
   (for example, the door wider than the wall), it is regenerated using the documented rule
   (next seed offset), and this is reported.
@@ -120,7 +135,8 @@ descriptions of the best found strategies) are labelled as such.
 
 ## 7. Known limitations (stated in advance)
 
-Abstract duel model with freely chosen rates (only relative results are meaningful), no active
+Abstract duel model with freely chosen rates (relative results do not gain external validity
+either, because the model is not calibrated), no active
 adversary movement, no doors that open, constant speeds, idealized perception, single-room
 scope, stylized playbooks.
 
@@ -140,17 +156,23 @@ committed before the measurement.
   reject at nominal one-sided 0.05 in at most 6 % of simulations. If it does not, H1 uses a
   residual permutation test (Freedman-Lane) instead of the bootstrap p-value.
 
+**Results (REVIEW_R4.md):** 32 scenarios miss the target (2.9 and 4.8 points, 0.018), 64 as well,
+128 meets it (1.4 and 2.4 points, 0.009), so E1 evaluates on 128. The H1 test rejects in 5.3 % of
+simulations, so the bootstrap p-value stays.
+
 ## Open before the freeze
 
-- External review of this draft. The header names an SME review; no real instructor is available
-  so far, so it has to be decided what replaces it.
-- H3 and H4 need data that `killhouse-bench` does not produce: H3 a sensitivity run, H4 a
-  comparison with #3/#4 outside. Their room set, budget and script have to be fixed. Until then
-  `killhouse-analyze` reports its Holm step as provisional.
 - The expected number of valid rooms is low for technique comparisons: the crossing techniques
   were invalid in 7 of 40 rehearsal rooms, mostly through collisions.
 
 ## Change log
+
+- 2026-11-04: review R4 (REVIEW_R4.md): E1 reduced to H1 and H2, H3 and H4 become separate
+  studies; estimand stated (search procedure incl. selection, no guaranteed lower bound); zero
+  denominator and unrounded values fixed; H2 limited to rooms where both are valid, ties defined;
+  "time floor" replaced by "no improvement found"; expert validation replaced by a method and
+  source check; failure rules for H1; interchangeability proxy removed; pre-freeze checks added
+  and run: 128 evaluation scenarios, H1 bootstrap p-value kept.
 
 - 2026-11-04: analysis script `killhouse/analysis.py` added. Writing it showed that the H1 rule
   ("CI excludes 0") could not enter the Holm step, so H1 now has a bootstrap p-value and H1, H2

@@ -68,8 +68,8 @@ preprint(s), later possibly a thesis.
 2. **Optimizer gaps are low-reliability (revised after R3).** With one candidate selected
    per doctrine and scored on held-out scenarios, gaps are 1-54 % at the full budget, but two
    optimizer seeds differ by up to 20 points (M-center crisscross 20 % vs. 0 %). The earlier
-   "0 % for centre-fed doors" came from too small a budget. Gaps are lower bounds on attainable
-   improvement in the model, not stable effect sizes. On 40 generated rooms
+   "0 % for centre-fed doors" came from too small a budget. Gaps describe a fixed search procedure
+   in the model; they are neither guaranteed lower bounds nor stable effect sizes. On 40 generated rooms
    (REPORT_G1_rehearsal) the pooled gaps have a median of 29 % (0-56 %), and two optimizer
    families agree within 5 points in 57 % of room-technique pairs. The pattern from three rooms
    in REPORT_M2 (corner-fed stable, centre-fed bimodal) does not generalize.

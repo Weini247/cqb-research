@@ -33,23 +33,26 @@ is valid. The other 7 did not clear the room in time.
 | pie + crisscross | 33 | 20 % | 19 % | 2-30 % |
 | limited penetration | 36 | 36 % | 33 % | 0-52 % |
 
-No pooled gap is negative. All gaps are lower bounds in the model, not effect sizes in reality.
+No pooled gap is negative. The gaps describe this fixed search procedure in the model; they are
+Monte-Carlo estimates, not guaranteed lower bounds, and not effect sizes in reality. The rehearsal
+evaluated on 32 scenarios, so a single gap carries a standard error of about 3 points (REVIEW_R4).
+E1 uses 128.
 
 **Agreement of the optimizers:** 77 of 135 pairs (57 %) are method-stable (at most 5 points
-apart), 60 % in corner-fed and 53 % in centre-fed rooms; all pairs agree in 13 of 40 rooms. The
+apart), 60 % in corner-fed and 53 % in centre-fed rooms; all pairs agree in 12 of the 39 rooms with a
+valid technique. The
 median difference is 3.9 points, the maximum 27.7. CEM has the larger gap in 75 pairs, CMA-ES in
-51, 9 are ties. As a rough reference, splitting each pair's ten runs at random into two halves
-gives 78 % within 5 points (a proxy that uses the best held-out gap of each half), so even
-interchangeable methods would not reach 100 %.
+51, 9 are ties. Part of this is evaluation noise at 32 scenarios.
 
 **Runs:** the ten runs of a pair differ by 15 points (median of max - min). The mean best of k
 runs (proxy, held-out) is 24.1 % for k = 1, 30.7 % for k = 5 and 32.4 % for k = 10. The pooled
 gap averages 30.8 %, the median of the runs 24.3 %. Pooling therefore matters, and more runs
 would add little, as far as the runs can show: basins that no run reached stay invisible.
 
-**Time floor:** in 5 pairs no run leaves the technique, all at `t_clear` = 0.9 s, which is also
-the fastest time in those rooms' fronts. The "equal or better time" rule leaves no room there,
-so these zeros are not search failures. Without them, 90 of 1300 runs (7 %) stay at the technique.
+**No improvement found:** in 5 pairs no run leaves the technique, all at `t_clear` = 0.9 s, which
+is also the fastest time in those rooms' fronts. Under the search budget no improvement was found
+there; search failure is not excluded. In the other pairs, 90 of 1300 runs (7 %) stay at the
+technique.
 
 **Overfitting to planning scenarios:** 26 of 1350 runs and 2 single-method gaps
 (G1-17 CEM -10 %, G1-28 CMA-ES -11 %) are negative on held-out scenarios. Pooling removed both.
@@ -67,7 +70,6 @@ are similar with and without it (means 28 % and 31 %).
 | H1 adjusted for room width | corner-fed +5.8 points, CI [1.0, 11.3], one-sided p = 0.007; width -3.2 points per metre |
 | H1 adjusted, CEM alone / CMA-ES alone | +6.1, CI [-0.1, 14.2], p = 0.027 / +4.8, CI [-1.6, 11.3], p = 0.063 |
 | H2 crisscross < buttonhook | 25 of 33 rooms (76 %), one-sided p = 0.002; corner-fed 14 of 21 (67 %), centre-fed 11 of 12 (92 %) |
-| H3, H4 | not covered: this run does not produce the data |
 
 All numbers of the adjusted rows come from `killhouse-analyze` on the two result files; it
 confirms that they hold exactly `generated_rooms(1, 40)`. The adjusted H1 passes on the pooled gap
@@ -89,5 +91,5 @@ definition.
 
 ## Consequences
 
-The changes are in PREREG_E1_draft.md (change log 2026-11-04). The draft is **not frozen**. Still
-open before the freeze: a review, and a decision on how H3 and H4 get their data.
+The changes are in PREREG_E1_draft.md (change log 2026-11-04), and review R4 followed
+(REVIEW_R4.md). E1 now consists of H1 and H2. The draft is **not frozen**.

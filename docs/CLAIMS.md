@@ -23,6 +23,6 @@ Nothing here is confirmatory (see RUNLOG.md).
 | C6 | Mixing techniques lowers the worst-case single-threat risk by 26-29 % (centre-fed) vs. 4-5 % (corner-fed) | supported for the defined game | `out/adversary.json`, fe35d94 | exact LP value, multi-threat game |
 | C7 | Crossing techniques lose validity under execution noise (21-38 % valid at 1x, M/L rooms) | supported (exploratory) | `out/robustness.json`, fe35d94 | breakdown by cause, correlated noise, CIs |
 | C8 | Trade-off between risk, predictability and robustness | hypothesis | C6 + C7 on different bases | common instances and assumptions |
-| C9 | A four-operator entry lowers `risk_multi` vs. two in M/L rooms | supported (exploratory) | `tactics.json` team-size rows, deb8e15 | prereg H4 on held-out rooms |
+| C9 | A four-operator entry lowers `risk_multi` vs. two in M/L rooms | supported (exploratory) | `tactics.json` team-size rows, deb8e15 | separate study (former H4) |
 | C10 | Door watch lowers single-threat risk in apartments (12/12 pairs) | supported (exploratory) | ad-hoc run, see TACTICS.md | result file not archived |
 | C11 | Closed doors lower risk and add time (APT5: 0.965 -> 0.913, 46.8 -> 60.1 s) | supported (exploratory) | ad-hoc run, d5ce0ab | more apartments, archived file |

@@ -47,6 +47,8 @@ class ModelCfg:
 DEFAULT_CFG = ModelCfg()
 # Reported numbers use threat placements no plan was tuned on (see docs/PREREG_E1_draft.md)
 EVAL_CFG = ModelCfg(scenario_salt=1)
+# Study E1 evaluates on more of the same scenarios: 32 miss the precision target (review R4)
+E1_CFG = ModelCfg(scenario_salt=1, n_scenarios=128)
 
 
 @dataclass

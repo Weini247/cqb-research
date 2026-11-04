@@ -15,7 +15,7 @@ import numpy as np
 
 from . import entry, optimize
 from .doctrine import doctrines
-from .entry import EVAL_CFG, Playbook, Result, evaluate
+from .entry import E1_CFG, Playbook, Result, evaluate
 from .optimize import Archive, cem, decode, encode
 from .room import Room, generated_rooms, standard_rooms
 from .team import default_team
@@ -102,7 +102,7 @@ def bench_room(
     doc_out, replays, planned = [], [], []
     for pb in docs:
         plan = evaluate(room, pb, team)  # planning scenarios
-        res = evaluate(room, pb, team, keep=True, cfg=EVAL_CFG)  # held-out scenarios
+        res = evaluate(room, pb, team, keep=True, cfg=E1_CFG)  # held-out scenarios
         planned.append(plan)
         doc_out.append({"name": pb.name, **res.metrics()})
         doc_out[-1]["risk_exact"] = res.objective(
@@ -149,12 +149,10 @@ def bench_room(
     # reintroduce a selection bias (winner's curse); that optimistic value is kept separately.
     held = Archive()
     for i in archive.front():
-        held.add(
-            evaluate(room, decode(archive.xs[i], room, team), team, cfg=EVAL_CFG), archive.xs[i]
-        )
+        held.add(evaluate(room, decode(archive.xs[i], room, team), team, cfg=E1_CFG), archive.xs[i])
 
     def held_risk(a: Archive, i: int) -> float:
-        res = evaluate(room, decode(a.xs[i], room, team), team, cfg=EVAL_CFG)
+        res = evaluate(room, decode(a.xs[i], room, team), team, cfg=E1_CFG)
         return res.objective(optimize.OBJECTIVE)
 
     for d in doc_out:
@@ -202,7 +200,7 @@ def bench_room(
         t0 = min(archive.rows[i][1] for i in knee_front)
         i = min(knee_front, key=lambda i: archive.rows[i][0] / e0 + archive.rows[i][1] / t0)
         pb = decode(archive.xs[i], room, team)
-        res = evaluate(room, pb, team, keep=True, cfg=EVAL_CFG)
+        res = evaluate(room, pb, team, keep=True, cfg=E1_CFG)
         replays.append(_replay(room, "best found (knee)", pb, res))
     front_idx = archive.front()
     front = [list(archive.rows[i]) for i in front_idx]
@@ -296,6 +294,7 @@ def main(argv: list[str] | None = None) -> None:
             "objective": optimize.OBJECTIVE,
             "n_threats": entry.DEFAULT_CFG.n_threats,
             "n_scenarios": entry.DEFAULT_CFG.n_scenarios,
+            "n_eval_scenarios": E1_CFG.n_scenarios,
             "dt": entry.DT,
             "horizon": entry.HORIZON,
             "half_fov_deg": round(np.degrees(entry.HALF_FOV), 1),
