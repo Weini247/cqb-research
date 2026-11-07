@@ -1,8 +1,10 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "cqb-research: coordinated search under visibility constraints"
+abstract: "Research simulator for coordinated multi-agent search under limited visibility, with a preregistered study (E1) on how stylized room-entry techniques compare with optimized strategies in an abstract model."
 authors:
   - alias: "Weini247"
-version: 0.1.0
-date-released: 2026-11-02
+version: 0.2.0
+date-released: 2026-11-07
+license: MIT
 repository-code: "https://github.com/Weini247/cqb-research"

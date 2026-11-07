@@ -1,7 +1,8 @@
 [project]
 name = "killhouse"
-version = "0.1.0"
-description = "CQB/Killhouse simulation prototype: procedural building, 4-operator team, replay viewer"
+version = "0.2.0"
+description = "Research simulator for coordinated multi-agent search under limited visibility"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.4",
