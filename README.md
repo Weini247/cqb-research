@@ -69,7 +69,7 @@ method.
 | [REVIEW_R1](docs/REVIEW_R1.md), [R2](docs/REVIEW_R2.md), [R3](docs/REVIEW_R3.md), [R4](docs/REVIEW_R4.md) | AI-assisted methodological reviews and responses |
 | [ROADMAP](docs/ROADMAP.md) | stages and milestones |
 
-All findings so far are **exploratory and model-internal**. Most parameters are free
+All findings are **model-internal**, and all except the two E1 tests are exploratory. Most parameters are free
 modelling choices; technique names denote stylized movement models, not verified procedures.
 Two reviews found real methodological errors (an information leak and a selection bias); both
 are fixed and documented.

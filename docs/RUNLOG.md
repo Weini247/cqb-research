@@ -1,9 +1,9 @@
 # Run and knowledge log
 
-Required by review R2: which results were known when the model was changed. **All results so
-far are exploratory.** They shaped the model, so they cannot count as confirmation. The
-confirmatory rooms (`generated_rooms(2026, 40)`, SHA-256 in the prereg) have never been
-evaluated; only their hash was computed.
+Required by review R2: which results were known when the model was changed. **All results
+before E1 are exploratory.** They shaped the model, so they cannot count as confirmation. The
+confirmatory rooms (`generated_rooms(2026, 40)`, SHA-256 in the prereg) were evaluated once, for
+study E1, after the plan was frozen (last row).
 
 | commit | model state | results known at that point | changes it caused |
 |---|---|---|---|
