@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased (v0.2.1, v0.3-a and v0.3-b; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+## Unreleased (v0.2.1, v0.3-a, v0.3-b, v0.3-c; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+
+- Model v0.3 `sim2` ([docs/MODEL_SIM2.md](docs/MODEL_SIM2.md), `killhouse-search`): closed-loop
+  agents with separate body heading and attention, per-agent knowledge, delayed messages,
+  scripted coordinated search, waiting, side-stepping and giving way, wall clearance. Tests for
+  information limits, motion limits and determinism. The E1 model is unchanged.
+- Replay: optional per-agent `first_known` and `mode`, model name and
+  `attention_equals_heading` from the source; viewer shows the selected agent's knowledge and
+  mode, coverage label.
 
 - Golden test `tests/test_e1_golden.py`: main must reproduce the archived E1 numbers.
 - Replay format `killhouse.replay/2` (`killhouse-replay`, `validate()`), conventions in

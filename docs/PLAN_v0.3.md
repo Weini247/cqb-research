@@ -142,7 +142,7 @@ Effort in working sessions of a few hours, rough.
   tolerance), size budget for the HTML.
 - **Demo:** new README GIFs.
 
-### v0.3-c Agent state (3-4 sessions)
+### v0.3-c Agent state (3-4 sessions) - first version done, see MODEL_SIM2.md
 - **Scope:** `sim2` with `AgentState` (body heading and attention separate, each with its own
   turn rate), motion modes, per-agent knowledge map, scripted policies that reproduce today's
   apartment clearing **but** decide from their own knowledge; communication with a fixed delay.

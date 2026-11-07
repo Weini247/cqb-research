@@ -17,6 +17,7 @@ killhouse-tactics = "killhouse.tactics:main"
 killhouse-analyze = "killhouse.analysis:main"
 killhouse-prefreeze = "killhouse.prefreeze:main"
 killhouse-replay = "killhouse.replay:main"
+killhouse-search = "killhouse.sim2.core:main"
 
 [dependency-groups]
 dev = [

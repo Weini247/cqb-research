@@ -33,21 +33,29 @@ def _events(rp: dict) -> list[dict]:
     return sorted(ev, key=lambda e: e["t"])
 
 
+def _agent(rp: dict, pos, gaze, att, i: int) -> dict:
+    a = {
+        "x": pos[:, i, 0].tolist(),
+        "y": pos[:, i, 1].tolist(),
+        "heading": gaze[:, i].tolist(),
+        "attention": att[:, i].tolist(),
+    }
+    # optional, model v0.3: what this agent knows (own sight or messages) and its motion mode
+    if "first_known" in rp:
+        a["first_known"] = rp["first_known"][i]
+    if "mode" in rp:
+        a["mode"] = rp["mode"][i]
+    return a
+
+
 def _run(rp: dict) -> dict:
     pos, gaze = np.asarray(rp["pos"], float), np.asarray(rp["gaze"], float)
+    att = np.asarray(rp.get("attention", rp["gaze"]), float)
     return {
         "name": rp["name"],
         "metrics": rp["metrics"],
         "steps": len(pos),
-        "agents": [
-            {
-                "x": pos[:, i, 0].tolist(),
-                "y": pos[:, i, 1].tolist(),
-                "heading": gaze[:, i].tolist(),
-                "attention": gaze[:, i].tolist(),
-            }
-            for i in range(pos.shape[1])
-        ],
+        "agents": [_agent(rp, pos, gaze, att, i) for i in range(pos.shape[1])],
         "first_seen": rp["first_seen"],
         "markers": rp.get("markers", []),
         "events": _events(rp),
@@ -65,7 +73,8 @@ def from_results(results: dict, source: str) -> dict:
             "half_fov_deg": cfg["half_fov_deg"],
             "objective": cfg.get("objective", "risk"),
             # model v0.2 has one angle per agent: body, view and attention coincide
-            "attention_equals_heading": True,
+            "attention_equals_heading": cfg.get("attention_equals_heading", True),
+            "name": cfg.get("model", "v0.2"),
         },
         "provenance": {
             "source": source,
@@ -110,6 +119,15 @@ def validate(doc: dict) -> list[str]:
                 err.append(
                     f"{where}: first_seen has {len(run['first_seen'])} entries for {m} points"
                 )
+            for a in run["agents"]:
+                if "first_known" in a and len(a["first_known"]) != m:
+                    err.append(
+                        f"{where}: first_known has {len(a['first_known'])} entries for {m} points"
+                    )
+                if "mode" in a and len(a["mode"]) != run["steps"]:
+                    err.append(
+                        f"{where}: mode has {len(a['mode'])} entries for {run['steps']} steps"
+                    )
             end = (run["steps"] - 1) * doc["dt"]
             for e in run["events"]:
                 if not 0 <= e["t"] <= end + 1e-9:

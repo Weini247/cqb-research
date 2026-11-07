@@ -93,7 +93,9 @@ function adapt(doc) {
         const door_open = new Array((sc.environment.doors || []).length).fill(-1);
         run.events.filter(e => e.type === "door_open").forEach(e => { door_open[e.door] = e.t; });
         return { name: run.name, metrics: run.metrics, markers: run.markers, first_seen: run.first_seen,
-          events: run.events, pos, gaze, att, door_open };
+          events: run.events, pos, gaze, att, door_open,
+          known: A[0].first_known ? A.map(a => a.first_known) : null,  // model v0.3: per agent
+          mode: A[0].mode ? A.map(a => a.mode) : null };
       }),
     })),
   };
@@ -513,7 +515,7 @@ function loadTech(k) {
   const m = rep.metrics;
   const OBJ = D.config.objective || "risk";
   const tc = m.t_clear == null ? "–" : m.t_clear.toFixed(1) + " s";
-  $("metrics").innerHTML = `Risiko <b>${m[OBJ].toFixed(3)}</b> · gesichert nach <b>${tc}</b>`
+  $("metrics").innerHTML = `${OBJ === "coverage" ? "Abdeckung" : "Risiko"} <b>${m[OBJ].toFixed(3)}</b> · gesichert nach <b>${tc}</b>`
     + (m.fratricide != null ? ` · Fratricide ${m.fratricide.toFixed(1)} s` : ` · Dauer ${m.duration} s`)
     + `${m.feasible ? "" : " · <span style='color:#ff8a80'>nicht vollständig gesichert</span>"}`
     + (ghostRep ? ` · Geist: ${ghostRep.name} (R ${ghostRep.metrics[OBJ].toFixed(3)})` : "");
@@ -597,20 +599,25 @@ function update(dtAnim) {
   controls.update();
   $("seek").value = Math.round(tc / dur * 1000);
   const pct = n => Math.round(100 * n / rep.first_seen.length);
-  $("time").textContent = `t = ${tc.toFixed(1)} s · gesehen ${pct(seen)} %`;
+  const mine = sel >= 0 && rep.known;
+  $("time").textContent = `t = ${tc.toFixed(1)} s · ${mine ? D.team[sel].name + " weiß" : "gesehen"} ${pct(seen)} %`;
   if (sel >= 0) {
     const m = team[sel], o = D.team[sel], deg = v => ((v * 180 / Math.PI) % 360 + 360) % 360;
     $("agentinfo").innerHTML = `<span class="dot" style="background:${o.color}"></span> <b>${o.name}</b>`
       + ` · ${m.speed.toFixed(2)} m/s · Körper ${deg(m.heading).toFixed(0)}° · Aufmerksamkeit ${deg(m.attention).toFixed(0)}°`
-      + (DOC.model.attention_equals_heading ? ` <span class="muted">(Modell v0.2: beides gleich)</span>` : "");
+      + (DOC.model.attention_equals_heading ? ` <span class="muted">(Modell v0.2: beides gleich)</span>` : "")
+      + (rep.mode ? ` · ${["geht", "wartet", "fertig"][rep.mode[sel][Math.min(k, rep.mode[sel].length - 1)]]}` : "")
+      + (rep.known ? ` <span class="muted">· Punkte = Wissen dieser Figur</span>` : "");
   }
   draw(tc, k, kg, pct);
 }
 
 // threat positions and doors as they are in run r at step k
+// with an agent selected and per-agent knowledge in the replay, the dots show what *that* agent knows
 function runState(r, k, tc) {
   let seen = 0;
-  r.first_seen.forEach((fs, j) => { const g = k >= fs; seen += g; dots.setColorAt(j, g ? GREEN : RED); });
+  const fsArr = sel >= 0 && r.known ? r.known[sel] : r.first_seen;
+  fsArr.forEach((fs, j) => { const g = k >= fs; seen += g; dots.setColorAt(j, g ? GREEN : RED); });
   dots.instanceColor.needsUpdate = true;
   doorMeshes.forEach(({ d, panel, leaf }, i) => {
     const to = r.door_open ? r.door_open[i] : -1;
@@ -632,7 +639,7 @@ function draw(tc, k, kg, pct) {
     on.forEach(m => { m.g.visible = true; }); off.forEach(m => { m.g.visible = false; });
     markers.forEach(mk => { mk.mesh.visible = r === rep; });
     const seen = runState(r, kk, tc);
-    $(lbl).innerHTML = `<b>${r.name}</b> · R ${r.metrics[D.config.objective || "risk"].toFixed(3)} · gesehen ${pct(seen)} %`;
+    $(lbl).innerHTML = `<b>${r.name}</b> · ${D.config.objective === "coverage" ? "Abdeckung" : "R"} ${r.metrics[D.config.objective || "risk"].toFixed(3)} · gesehen ${pct(seen)} %`;
     renderer.setViewport(x0, 0, half, H); renderer.setScissor(x0, 0, half, H); renderer.render(scene, camera);
   });
   team.forEach(m => { m.g.visible = true; }); ghostTeam.forEach(m => { m.g.visible = true; });
