@@ -1,9 +1,9 @@
-# Preregistration draft: E1 (NOT FROZEN)
+# Preregistration: E1 (FROZEN)
 
-Status: **draft**. It will be frozen (git tag + upload to a registry such as OSF) after the
-documented method and source check (reviews R1-R4, [TACTICS.md](TACTICS.md)). No instructor or
-other subject-matter expert has reviewed it. Until the freeze, everything below may change.
-Changes are logged in the change log at the end.
+Status: **frozen on 2026-11-07 at git tag `e1-prereg`**, after the documented method and source
+check (reviews R1-R4, [TACTICS.md](TACTICS.md)). No instructor or other subject-matter expert has
+reviewed it. The file keeps its old name so that links stay valid. From the tag on, the plan below
+does not change; every deviation is reported in the study report with its reason (§6).
 
 ## 0. Scope and validity limits
 
@@ -160,12 +160,14 @@ committed before the measurement.
 128 meets it (1.4 and 2.4 points, 0.009), so E1 evaluates on 128. The H1 test rejects in 5.3 % of
 simulations, so the bootstrap p-value stays.
 
-## Open before the freeze
+## Noted at the freeze
 
 - The expected number of valid rooms is low for technique comparisons: the crossing techniques
   were invalid in 7 of 40 rehearsal rooms, mostly through collisions.
 
 ## Change log
+
+- 2026-11-07: frozen at tag `e1-prereg`. The confirmatory rooms had not been evaluated.
 
 - 2026-11-04: review R4 (REVIEW_R4.md): E1 reduced to H1 and H2, H3 and H4 become separate
   studies; estimand stated (search procedure incl. selection, no guaranteed lower bound); zero
