@@ -28,9 +28,18 @@ entries and event times. The viewer converts the document once and never extrapo
 
 ## State versus picture
 
-The viewer interpolates between steps and may add cosmetic motion (walk cycle). It never changes
-position, heading or attention. In model v0.2 heading and attention are the same angle; the viewer
-draws attention as its own ray so that later models can separate them.
+The viewer interpolates between steps and may add cosmetic motion. It never changes position,
+heading or attention. In model v0.2 heading and attention are the same angle; the viewer draws
+attention as its own ray so that later models can separate them.
+
+| shown | from the replay | cosmetic |
+|---|---|---|
+| position, body heading | yes | — |
+| attention ray, neck and head turn | attention minus heading | split 40 % neck / 60 % head, limited to 69 degrees |
+| walk / idle blend and cycle speed | simulated speed | the clips themselves (leg swing, body bob, chest twist) |
+| figure shape | body height and radius | limbs, helmet, equipment |
+
+"Figur: Kapsel (Modell)" shows the simulated body without any cosmetic motion.
 
 ## Protected E1 path
 

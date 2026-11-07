@@ -12,6 +12,11 @@ study, **not** a validated tactical model. See [Scope and ethics](ETHICS.md).
 |---|---|
 | ![apartment](docs/media/apartment.gif) | ![room entry](docs/media/room-entry.gif) |
 
+Research viewer (v0.3 in progress): a technique and the best strategy found, side by side, with
+animated figures and their attention direction.
+
+![split view](docs/media/viewer-split.gif)
+
 ## Result of the first confirmatory study (E1)
 
 Preregistered and frozen before the run ([PREREG_E1](docs/PREREG_E1_draft.md), tag `e1-prereg`),

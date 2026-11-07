@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (v0.2.1 and first part of v0.3-a, plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+## Unreleased (v0.2.1, v0.3-a and v0.3-b; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
 
 - Golden test `tests/test_e1_golden.py`: main must reproduce the archived E1 numbers.
 - Replay format `killhouse.replay/2` (`killhouse-replay`, `validate()`), conventions in
@@ -8,6 +8,13 @@
 - Viewer: agent selection with live speed, heading and attention; attention ray; chase camera
   behind the selected agent; slow cinematic orbit; event marks on the timeline (cleared, door
   opened); share of seen positions; PNG and WebM export.
+- Viewer: side-by-side comparison of two runs with the same camera; animated figures (jointed
+  body driven by idle and walk clips through an AnimationMixer, walk blended and time-scaled by
+  the simulated speed, neck and head turned only by replayed attention minus heading); figure
+  styles animated / test dummy / capsule (model view); image-based environment light; the walk
+  cycle now advances in simulation time, also in slow motion.
+- Headless viewer test (`tests/test_viewer_smoke.py`, `?selftest`): every run, camera, figure
+  style and the split view, finite poses, walk clip at body speed (no foot sliding).
 - Removed the spike-1 prototype (`building.py`, `sim.py`, old `replay.py`, `viewer.html`,
   `cli.py` and its test).
 
