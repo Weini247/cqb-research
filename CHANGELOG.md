@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased (v0.2.1 and first part of v0.3-a, plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+
+- Golden test `tests/test_e1_golden.py`: main must reproduce the archived E1 numbers.
+- Replay format `killhouse.replay/2` (`killhouse-replay`, `validate()`), conventions in
+  [docs/CONVENTIONS.md](docs/CONVENTIONS.md); the viewer now reads only this format.
+- Viewer: agent selection with live speed, heading and attention; attention ray; chase camera
+  behind the selected agent; slow cinematic orbit; event marks on the timeline (cleared, door
+  opened); share of seen positions; PNG and WebM export.
+- Removed the spike-1 prototype (`building.py`, `sim.py`, old `replay.py`, `viewer.html`,
+  `cli.py` and its test).
+
 ## 0.2.0 (2026-11-07): first confirmatory study
 
 **Study E1**, preregistered and frozen before the run (tag `e1-prereg`), evaluated once on 40

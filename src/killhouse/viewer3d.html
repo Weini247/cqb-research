@@ -14,7 +14,10 @@
     padding:10px 12px; backdrop-filter:blur(6px); }
   #top { left:12px; top:12px; max-width:min(420px, calc(100% - 24px)); }
   #bar { left:12px; right:12px; bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-  #bar input[type=range]#seek { flex:1; min-width:140px; }
+  #seekwrap { position:relative; flex:1; min-width:140px; display:flex; }
+  #seek { width:100%; }
+  #ticks { position:absolute; left:8px; right:8px; top:-7px; height:8px; pointer-events:none; }
+  .tick { position:absolute; width:3px; height:9px; border-radius:1px; transform:translateX(-1px); }
   select, button { background:#2a2f38; color:var(--fg); border:1px solid var(--line); border-radius:6px;
     padding:4px 8px; font:inherit; cursor:pointer; }
   button.on { background:var(--accent); color:#111; border-color:var(--accent); }
@@ -43,6 +46,7 @@
   </div>
   <div id="metrics" class="row muted"></div>
   <div id="team" class="row"></div>
+  <div id="agentinfo" class="row" style="display:none"></div>
   <div class="row muted">rot = ungesicherte Bedrohungsposition · grün = gesichert · Fächer = Blickkegel</div>
   <div class="row muted">Figuren rot/orange/grau = eine Beispiel-Platzierung: unentdeckt / entdeckt / identifiziert</div>
   <div class="row" style="color:#f3c46b;font-size:12px">Abstraktes Simulationsmodell. Technik-Namen bezeichnen
@@ -51,18 +55,42 @@
 <div class="hud" id="bar">
   <button id="play">⏸</button>
   <select id="speed" aria-label="Tempo"><option value="0.25">0,25×</option><option value="0.5" selected>0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
-  <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Zeit">
+  <span id="seekwrap"><span id="ticks"></span><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Zeit"></span>
   <span id="time" class="muted" style="min-width:64px"></span>
   <span class="muted">Wände</span><input id="wallh" type="range" min="0.3" max="2.6" step="0.1" value="1.2" aria-label="Wandhöhe" style="width:90px">
-  <button id="cam-oblique" class="on">Schräg</button><button id="cam-top">Draufsicht</button><button id="cam-follow">Folgen</button>
-  <button id="fov" class="on">Blickkegel</button>
+  <select id="agent" aria-label="Figur"></select>
+  <button id="cam-oblique" class="on">Schräg</button><button id="cam-top">Draufsicht</button><button id="cam-follow">Folgen</button><button id="cam-cine">Kino</button>
+  <button id="fov" class="on">Blickkegel</button><button id="ray" class="on">Blickrichtung</button>
+  <button id="png" title="Standbild speichern">PNG</button><button id="rec" title="Durchlauf als Video aufnehmen">● Video</button>
   <button id="fig" title="Analysefigur (exakter Körper) oder Testpuppe">Figur: Kapsel</button>
 </div>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const D = /*__DATA__*/null;
+const DOC = /*__DATA__*/null;  // killhouse.replay/2, see docs/CONVENTIONS.md
+const D = adapt(DOC);
+// The viewer only interprets the replay: per step position, heading and attention of each agent.
+function adapt(doc) {
+  return {
+    config: { dt: doc.dt, half_fov_deg: doc.model.half_fov_deg, objective: doc.model.objective },
+    team: doc.agents,
+    rooms: doc.scenes.map(sc => ({
+      room: sc.environment, points: sc.points,
+      replays: sc.runs.map(run => {
+        const A = run.agents, pos = [], gaze = [], att = [];
+        for (let k = 0; k < run.steps; k++) {
+          pos.push(A.map(a => [a.x[k], a.y[k]]));
+          gaze.push(A.map(a => a.heading[k])); att.push(A.map(a => a.attention[k]));
+        }
+        const door_open = new Array((sc.environment.doors || []).length).fill(-1);
+        run.events.filter(e => e.type === "door_open").forEach(e => { door_open[e.door] = e.t; });
+        return { name: run.name, metrics: run.metrics, markers: run.markers, first_seen: run.first_seen,
+          events: run.events, pos, gaze, att, door_open };
+      }),
+    })),
+  };
+}
 const $ = id => document.getElementById(id);
 const DT = D.config.dt, HALF_FOV = D.config.half_fov_deg * Math.PI / 180;
 
@@ -237,14 +265,21 @@ function mannequin(op, ghost) {
     new THREE.MeshBasicMaterial({ color: op.color, transparent: true, opacity: ghost ? 0.08 : 0.2,
       depthWrite: false }));
   fan.position.y = 0.02; fan.renderOrder = 2; f.g.add(fan);
-  return { ...f, fan, phase: 0 };
+  // attention direction: own child so that it can differ from the body heading in later models
+  const look = new THREE.Group(); look.position.y = op.height_m * 0.93; f.g.add(look);
+  const LEN = 3.5, lm = new THREE.MeshBasicMaterial({ color: op.color, transparent: true,
+    opacity: ghost ? 0.25 : 0.9, depthWrite: false });
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, LEN, 6).rotateZ(-Math.PI / 2), lm);
+  beam.position.x = LEN / 2; look.add(beam);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), lm); tip.position.x = LEN; look.add(tip);
+  return { ...f, fan, look, phase: 0, speed: 0, heading: 0, attention: 0 };
 }
 
 // ---------- world state ----------
 let world = new THREE.Group(); scene.add(world);
 let wallGroup = new THREE.Group();
 let team = [], ghostTeam = [], dots = null, room = null, rep = null, ghostRep = null;
-let t = 0, playing = true, camMode = "oblique", showFov = true;
+let t = 0, playing = true, camMode = "oblique", showFov = true, showRay = true, sel = -1, cineAng = 0;
 let doorMeshes = [], markers = [];
 const RED = new THREE.Color(0xe5484d), GREEN = new THREE.Color(0x5f9c78);
 
@@ -339,8 +374,20 @@ function floorLabel(text, x, y) {
 function spawn(list, ghost) {
   list.forEach(m => world.remove(m.g));
   const out = D.team.map(op => mannequin(op, ghost));
-  out.forEach(m => { m.fan.visible = showFov; world.add(m.g); });
+  out.forEach(m => world.add(m.g));
   return out;
+}
+
+function applyVis() {
+  [team, ghostTeam].forEach(list => list.forEach((m, i) => {
+    const mine = sel < 0 || i === sel;
+    m.fan.visible = showFov && mine; m.look.visible = showRay && mine;
+  }));
+}
+
+function eventLabel(e) {
+  return e.type === "cleared" ? `gesichert (${e.t.toFixed(1)} s)` : e.type === "door_open"
+    ? `Tür ${e.door + 1} offen (${e.t.toFixed(1)} s)` : `${e.type} (${e.t.toFixed(1)} s)`;
 }
 
 function loadTech(k) {
@@ -350,6 +397,10 @@ function loadTech(k) {
   ghostRep = gk >= 0 && gk !== k ? room.replays[gk] : null;
   ghostTeam = spawn(ghostTeam, true);
   ghostTeam.forEach(m => { m.g.visible = !!ghostRep; });
+  applyVis();
+  const dur = (rep.pos.length - 1) * DT;
+  $("ticks").innerHTML = (rep.events || []).map(e => `<span class="tick" title="${eventLabel(e)}" `
+    + `style="left:${(e.t / dur * 100).toFixed(2)}%;background:${e.type === "cleared" ? "#5fd38d" : "#c9ced6"}"></span>`).join("");
   markers.forEach(mk => world.remove(mk.mesh));
   markers = (rep.markers || []).map(mk => {
     const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.3, 6, 12),
@@ -369,6 +420,8 @@ function loadTech(k) {
 
 $("team").innerHTML = D.team.map(o => `<span class="op"><span class="dot" style="background:${o.color}"></span>`
   + `${o.name} <span class="muted">${o.height_m} m · r ${o.radius_m} m</span></span>`).join("");
+$("agent").innerHTML = `<option value="-1">alle Figuren</option>`
+  + D.team.map((o, i) => `<option value="${i}">${o.name}</option>`).join("");
 $("room").innerHTML = D.rooms.map((r, i) => `<option value="${i}">${r.room.name}</option>`).join("");
 
 // ---------- animation ----------
@@ -380,8 +433,10 @@ function pose(list, r, time, dt) {
     const a = r.pos[k][i], b = r.pos[k + 1][i];
     const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f;
     const g = lerpAng(r.gaze[k][i], r.gaze[k + 1][i], f);
-    m.g.position.set(x, 0, -y); m.g.rotation.y = g;
+    const at = lerpAng(r.att[k][i], r.att[k + 1][i], f);
+    m.g.position.set(x, 0, -y); m.g.rotation.y = g; m.look.rotation.y = at - g;
     const speed = Math.hypot(b[0] - a[0], b[1] - a[1]) / DT;
+    m.speed = speed; m.heading = g; m.attention = at;
     m.phase += speed * dt * 5.5;
     m.animate(m.phase, Math.min(1, speed / 1.6));
   });
@@ -390,7 +445,7 @@ function pose(list, r, time, dt) {
 
 function setCam(mode, snap) {
   camMode = mode;
-  ["oblique", "top", "follow"].forEach(c => $("cam-" + c).classList.toggle("on", c === mode));
+  ["oblique", "top", "follow", "cine"].forEach(c => $("cam-" + c).classList.toggle("on", c === mode));
   const R = room.room, E = extent(R), cx = (E.x0 + E.x1) / 2, cz = -(Math.max(E.y0, 0) + E.y1) / 2 + 0.8;
   const span = (Math.max(E.x1 - E.x0, E.y1 - E.y0) + 3) / Math.min(1, camera.aspect * 1.25);
   if (mode === "top") { camera.position.set(cx, span * 1.55, cz + 0.01); controls.target.set(cx, 0, cz); }
@@ -402,19 +457,24 @@ function setCam(mode, snap) {
 
 let last = performance.now();
 function frame(now) {
-  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; dtRaw = dt;
   const dur = (rep.pos.length - 1) * DT;
-  if (playing) { t += dt * +$("speed").value; if (t > dur + 1.0) t = 0; }
+  if (playing) {
+    t += dt * +$("speed").value;
+    if (t > dur + 1.0) { if (recorder) recorder.stop(); t = 0; }
+  }
   update(playing ? dt : 0);
   requestAnimationFrame(frame);
 }
 
+let dtRaw = 0;
 function update(dtAnim) {
   const dur = (rep.pos.length - 1) * DT;
   const tc = Math.min(t, dur);
   const k = pose(team, rep, tc, dtAnim);
   if (ghostRep) pose(ghostTeam, ghostRep, tc, dtAnim);
-  rep.first_seen.forEach((fs, j) => dots.setColorAt(j, k < fs ? RED : GREEN));
+  let seen = 0;
+  rep.first_seen.forEach((fs, j) => { const g = k >= fs; seen += g; dots.setColorAt(j, g ? GREEN : RED); });
   doorMeshes.forEach(({ d, panel, leaf }, i) => {
     const to = rep.door_open ? rep.door_open[i] : -1;
     const open = !d.closed || (to >= 0 && tc >= to);
@@ -423,14 +483,31 @@ function update(dtAnim) {
   markers.forEach(mk => mk.mesh.material.color.setHex(
     k < mk.t_detect ? 0xd64045 : k < mk.t_id ? 0xf3a712 : 0x8a919c));
   dots.instanceColor.needsUpdate = true;
-  if (camMode === "follow") {
+  if (camMode === "follow" && sel >= 0) {  // chase camera behind the selected agent
+    const m = team[sel], p = m.g.position, fx = Math.cos(m.heading), fz = -Math.sin(m.heading);
+    const want = new THREE.Vector3(p.x - fx * 4.5, 4.2, p.z - fz * 4.5);  // above the heads
+    camera.position.lerp(want, 0.08);
+    controls.target.lerp(new THREE.Vector3(p.x + fx * 2.5, 0.6, p.z + fz * 2.5), 0.12);
+  } else if (camMode === "follow") {
     const c = new THREE.Vector3(); team.forEach(m => c.add(m.g.position)); c.multiplyScalar(1 / team.length);
     const delta = c.clone().sub(controls.target).multiplyScalar(0.06);
     controls.target.add(delta); camera.position.add(delta);
+  } else if (camMode === "cine") {  // slow orbit around the scene
+    const E = extent(room.room), cx = (E.x0 + E.x1) / 2, cz = -(Math.max(E.y0, 0) + E.y1) / 2;
+    const rad = Math.max(E.x1 - E.x0, E.y1 - E.y0) * 0.9 + 3;
+    cineAng += (playing ? dtRaw : 0) * 0.12;
+    camera.position.set(cx + rad * Math.cos(cineAng), rad * 0.55, cz + rad * Math.sin(cineAng));
+    controls.target.set(cx, 0.6, cz);
   }
   controls.update();
   $("seek").value = Math.round(tc / dur * 1000);
-  $("time").textContent = `t = ${tc.toFixed(1)} s`;
+  $("time").textContent = `t = ${tc.toFixed(1)} s · gesehen ${Math.round(100 * seen / rep.first_seen.length)} %`;
+  if (sel >= 0) {
+    const m = team[sel], o = D.team[sel], deg = v => ((v * 180 / Math.PI) % 360 + 360) % 360;
+    $("agentinfo").innerHTML = `<span class="dot" style="background:${o.color}"></span> <b>${o.name}</b>`
+      + ` · ${m.speed.toFixed(2)} m/s · Körper ${deg(m.heading).toFixed(0)}° · Aufmerksamkeit ${deg(m.attention).toFixed(0)}°`
+      + (DOC.model.attention_equals_heading ? ` <span class="muted">(Modell v0.2: beides gleich)</span>` : "");
+  }
   renderer.render(scene, camera);
 }
 
@@ -446,9 +523,30 @@ $("ghost").onchange = () => loadTech(+$("tech").value);
 $("play").onclick = () => { playing = !playing; $("play").textContent = playing ? "⏸" : "▶"; };
 $("seek").oninput = e => { t = +e.target.value / 1000 * (rep.pos.length - 1) * DT; playing = false; $("play").textContent = "▶"; };
 $("wallh").oninput = buildWalls;
-["oblique", "top", "follow"].forEach(c => $("cam-" + c).onclick = () => setCam(c, c === "follow"));
-$("fov").onclick = () => { showFov = !showFov; $("fov").classList.toggle("on", showFov);
-  team.concat(ghostTeam).forEach(m => { m.fan.visible = showFov; }); };
+["oblique", "top", "follow", "cine"].forEach(c => $("cam-" + c).onclick = () => setCam(c, c === "follow"));
+$("fov").onclick = () => { showFov = !showFov; $("fov").classList.toggle("on", showFov); applyVis(); };
+$("ray").onclick = () => { showRay = !showRay; $("ray").classList.toggle("on", showRay); applyVis(); };
+$("agent").onchange = e => {
+  sel = +e.target.value; applyVis();
+  $("agentinfo").style.display = sel >= 0 ? "flex" : "none";
+};
+function download(url, name) { const a = document.createElement("a"); a.href = url; a.download = name; a.click(); }
+const shotName = ext => `killhouse_${room.room.name}_${rep.name}_${t.toFixed(1)}s.${ext}`.replace(/[^\w.+-]+/g, "_");
+$("png").onclick = () => { renderer.render(scene, camera); download(canvas.toDataURL("image/png"), shotName("png")); };
+let recorder = null;
+$("rec").onclick = () => {
+  if (recorder) { recorder.stop(); return; }
+  if (!window.MediaRecorder) { $("rec").textContent = "kein Video"; return; }
+  const chunks = [], name = shotName("webm");
+  recorder = new MediaRecorder(canvas.captureStream(30), { mimeType: "video/webm" });
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    download(URL.createObjectURL(new Blob(chunks, { type: "video/webm" })), name);
+    recorder = null; $("rec").textContent = "● Video"; $("rec").classList.remove("on");
+  };
+  t = 0; playing = true; $("play").textContent = "⏸";
+  recorder.start(); $("rec").textContent = "■ Stopp"; $("rec").classList.add("on");
+};
 
 $("fig").onclick = () => {
   figureStyle = figureStyle === "capsule" ? "dummy" : "capsule";
@@ -462,6 +560,8 @@ window.killhouse = {  // console / recording hooks
   snap() { renderer.render(scene, camera); return canvas.toDataURL("image/png"); },
   renderAt(v, dtAnim = 0) { t = v; playing = false; update(dtAnim); return canvas.toDataURL("image/png"); },
   duration: () => (rep.pos.length - 1) * DT,
+  select(i) { $("agent").value = i; $("agent").onchange({ target: $("agent") }); },
+  replay: DOC,
 };
 resize();
 const start = Math.max(0, D.rooms.findIndex(r => r.room.name === "L-corner" || r.room.boxes));

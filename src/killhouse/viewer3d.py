@@ -1,4 +1,4 @@
-"""`killhouse-3d`: bench results.json -> standalone three.js greybox viewer."""
+"""`killhouse-3d`: results.json -> standalone three.js viewer, fed with a replay document."""
 
 from __future__ import annotations
 
@@ -7,17 +7,16 @@ import json
 from importlib import resources
 from pathlib import Path
 
-KEEP = ("room", "points", "replays")
+from .replay import from_results, validate
 
 
-def to_html(results: dict) -> str:
-    data = {
-        "config": results["config"],
-        "team": results["team"],
-        "rooms": [{k: r[k] for k in KEEP} for r in results["rooms"]],
-    }
+def to_html(results: dict, source: str = "results.json") -> str:
+    doc = from_results(results, source)
+    problems = validate(doc)
+    if problems:
+        raise ValueError("invalid replay: " + "; ".join(problems[:3]))
     tpl = resources.files("killhouse").joinpath("viewer3d.html").read_text(encoding="utf-8")
-    payload = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
+    payload = json.dumps(doc, separators=(",", ":")).replace("</", "<\\/")
     return tpl.replace("/*__DATA__*/null", payload)
 
 
@@ -27,7 +26,8 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--out", type=Path, help="default: viewer3d.html next to results.json")
     a = ap.parse_args(argv)
     out = a.out or a.results.with_name("viewer3d.html")
-    out.write_text(to_html(json.loads(a.results.read_text(encoding="utf-8"))), encoding="utf-8")
+    data = json.loads(a.results.read_text(encoding="utf-8"))
+    out.write_text(to_html(data, a.results.name), encoding="utf-8")
     print(f"-> {out}")
 
 
