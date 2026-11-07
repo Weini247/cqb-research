@@ -59,6 +59,14 @@ preprint(s), later possibly a thesis.
 | 6 | confirmatory study on 40 held-out rooms, preprint | prereg draft |
 | 7-10 | LLM benchmark, robot scouts, tactic discovery, web lab | open |
 
+## Confirmatory result (E1, model-internal)
+
+The preregistered study E1 ([REPORT_E1](REPORT_E1.md)) ran on 40 rooms that were never used for
+development. Both hypotheses passed: at equal room width the crisscross gap is 10.7 points
+larger for corner-fed doors (CI 6.3-14.8), and crisscross has lower risk than buttonhook in 23 of
+31 rooms where both are valid. The two optimizer families agreed within 5 points in 65 % of
+room-technique pairs, so a single gap still depends noticeably on the search method.
+
 ## Main findings so far (all exploratory, model-internal)
 
 1. **Pairwise comparisons are stable in one-at-a-time sensitivity (20 variants):**

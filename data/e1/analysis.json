@@ -1,0 +1,248 @@
+{
+ "n_rooms": 40,
+ "pairs": 160,
+ "valid_pairs": 131,
+ "undefined_gaps": 0,
+ "rooms_with_step": 18,
+ "rooms_without_valid_technique": [
+  "G2026-32"
+ ],
+ "gaps": {
+  "all": {
+   "n": 131,
+   "median": 0.28652572196547965,
+   "mean": 0.2778132803761884,
+   "min": 0.0,
+   "max": 0.5211074320556826,
+   "with_fratricide": 70
+  },
+  "crisscross": {
+   "n": 31,
+   "median": 0.3073622246747626,
+   "mean": 0.29959471448871633,
+   "min": 0.16014756885124404,
+   "max": 0.45515041281402446,
+   "with_fratricide": 18
+  },
+  "buttonhook": {
+   "n": 33,
+   "median": 0.318629405329237,
+   "mean": 0.3068266685812721,
+   "min": 0.0,
+   "max": 0.5211074320556826,
+   "with_fratricide": 21
+  },
+  "pie+crisscross": {
+   "n": 31,
+   "median": 0.2288291300185159,
+   "mean": 0.2167639411049847,
+   "min": 0.11069175914011853,
+   "max": 0.3172738462221447,
+   "with_fratricide": 18
+  },
+  "limited-penetration": {
+   "n": 36,
+   "median": 0.3155462268770874,
+   "mean": 0.28503170396372135,
+   "min": 0.0,
+   "max": 0.5118803324584268,
+   "with_fratricide": 13
+  }
+ },
+ "reliability": {
+  "method_stable": [
+   85,
+   131
+  ],
+  "method_stable_by_family": {
+   "crisscross": [
+    18,
+    31
+   ],
+   "buttonhook": [
+    20,
+    33
+   ],
+   "pie+crisscross": [
+    22,
+    31
+   ],
+   "limited-penetration": [
+    25,
+    36
+   ]
+  },
+  "method_stable_corner_fed": [
+   47,
+   64
+  ],
+  "method_stable_centre_fed": [
+   38,
+   67
+  ],
+  "rooms_all_stable": [
+   18,
+   39
+  ],
+  "no_improvement": [
+   [
+    "G2026-16",
+    "buttonhook"
+   ],
+   [
+    "G2026-16",
+    "limited-penetration"
+   ],
+   [
+    "G2026-22",
+    "buttonhook"
+   ],
+   [
+    "G2026-22",
+    "limited-penetration"
+   ],
+   [
+    "G2026-25",
+    "buttonhook"
+   ],
+   [
+    "G2026-27",
+    "limited-penetration"
+   ],
+   [
+    "G2026-35",
+    "buttonhook"
+   ],
+   [
+    "G2026-35",
+    "limited-penetration"
+   ],
+   [
+    "G2026-36",
+    "buttonhook"
+   ],
+   [
+    "G2026-36",
+    "limited-penetration"
+   ]
+  ],
+  "runs_at_playbook": [
+   94,
+   1210
+  ],
+  "median_run_spread": 0.16377260708010055,
+  "best_of_k": {
+   "1": 0.2213108963417317,
+   "5": 0.2927670005321281,
+   "10": 0.30964602658409957
+  }
+ },
+ "H1": {
+  "n_rooms": 31,
+  "n_corner_fed": 15,
+  "width_range": {
+   "corner_fed": [
+    3.5,
+    7.75
+   ],
+   "centre_fed": [
+    3.75,
+    7.5
+   ]
+  },
+  "primary": {
+   "estimable": true,
+   "coef_corner": 0.10674464092760726,
+   "coef_width": -0.0072765654147687875,
+   "ci": [
+    0.0635,
+    0.1476
+   ],
+   "p": 0.0
+  },
+  "by_method": {
+   "cem": {
+    "estimable": true,
+    "coef_corner": 0.1121817850192783,
+    "coef_width": -0.004375637218756223,
+    "ci": [
+     0.0726,
+     0.1521
+    ],
+    "p": 0.0
+   },
+   "cmaes": {
+    "estimable": true,
+    "coef_corner": 0.1345531533681256,
+    "coef_width": -0.008306975382362164,
+    "ci": [
+     0.079,
+     0.1851
+    ],
+    "p": 0.0
+   }
+  },
+  "unadjusted": {
+   "n": [
+    15,
+    16
+   ],
+   "medians": [
+    0.3423,
+    0.2438
+   ],
+   "difference": 0.0985,
+   "ci": [
+    0.0381,
+    0.169
+   ]
+  },
+  "outer_third": {
+   "n": [
+    16,
+    15
+   ],
+   "medians": [
+    0.3422,
+    0.2522
+   ],
+   "difference": 0.09,
+   "ci": [
+    0.0347,
+    0.1678
+   ]
+  },
+  "p_holm": 0.0,
+  "supported": true
+ },
+ "H2": {
+  "wins": 23,
+  "losses": 8,
+  "ties": 0,
+  "both_valid": 31,
+  "not_both_valid": 9,
+  "share": 0.7419354838709677,
+  "p": 0.005336920265108347,
+  "corner_fed": {
+   "wins": 7,
+   "losses": 8,
+   "ties": 0,
+   "both_valid": 15,
+   "not_both_valid": 5,
+   "share": 0.4666666666666667,
+   "p": 0.696380615234375
+  },
+  "centre_fed": {
+   "wins": 16,
+   "losses": 0,
+   "ties": 0,
+   "both_valid": 16,
+   "not_both_valid": 4,
+   "share": 1.0,
+   "p": 1.52587890625e-05
+  },
+  "p_holm": 0.005336920265108347,
+  "supported": true
+ },
+ "rooms_digest": "90a6edacd9aee951cb12a38e613c39a41095014147f7ae8b87a369daa75a4315"
+}

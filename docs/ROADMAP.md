@@ -50,7 +50,8 @@ would be separate research with its own tasks and evidence.
 2. Schnittstelle für Planungsverfahren und Aufgabenspezifikation; klassische Vergleichsverfahren
    (zufällige Suche, gierige Sichtabdeckung, Watchman-Route)
 3. Fehlerdiagnose pro Durchlauf (ungesehener Bereich, Kollision, späte Identifikation, ...)
-4. Studie 1, präregistriert: Zuverlässigkeit von Rangfolgen auf zurückgehaltenen Räumen
+4. ✅ Studie 1 (E1), präregistriert, auf 40 zurückgehaltenen Räumen: H1 und H2 bestätigt
+   ([REPORT_E1](REPORT_E1.md))
 5. Release v0.2 und Preprint
 6. Weitere Verfahren auf der Plattform: Sprachmodell-Planer, Roboter-Szenarien, Taktiksuche
 

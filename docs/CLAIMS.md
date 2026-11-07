@@ -2,11 +2,14 @@
 
 Review R3 (M1): every main claim has a data reference or is labelled a hypothesis. Status:
 **supported (exploratory)** = backed by result files from the development rooms;
-**hypothesis** = plausible but not shown on a common basis; **retracted** = withdrawn.
-Nothing here is confirmatory (see RUNLOG.md).
+**hypothesis** = plausible but not shown on a common basis; **retracted** = withdrawn;
+**confirmed (E1)** = preregistered test on held-out rooms passed (REPORT_E1.md). All claims are
+model-internal.
 
 | # | claim | status | evidence (file, commit) | open check |
 |---|---|---|---|---|
+| E1-H1 | At equal room width, the crisscross gap is larger in corner-fed than in centre-fed rooms: +10.7 points, CI [6.3, 14.8]; holds for each optimizer alone | **confirmed (E1)**, association, not causal | `data/e1/analysis.json`, REPORT_E1, 25f8197 | other model assumptions |
+| E1-H2 | Where both are valid, crisscross has lower risk than buttonhook: 23 of 31 rooms (74 %), p = 0.005 | **confirmed (E1)** for rooms where both are valid | same | exploratory: all 16 centre-fed vs. 7 of 15 corner-fed rooms |
 | C1 | Crisscross < buttonhook in pairwise risk comparisons across 20 one-at-a-time variants (164/165) | supported (exploratory), standard rooms only | `out/sensitivity-r1.json`, 4cb99f3 | interactions between axes; common denominator; see C15 for generated rooms |
 | C2 | Pie + crisscross < crisscross (164/164) at 2.5-3 s more time | supported (exploratory) | same | as C1 |
 | C3 | The optimizer finds lower-risk strategies than every stylized technique (1-54 %) | supported, **low reliability** | `out/bench-r3`, `out/bench-r3-s1`, f4f44ee | seeds differ by up to 20 points; see C3a/C3b |

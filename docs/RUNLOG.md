@@ -20,6 +20,7 @@ evaluated; only their hash was computed.
 | b5072b8 / (M2c commit) | pooled estimator, CMA-ES | pooled CEM and CMA-ES on M-center, M-corner, L-center (5 seeds each) | second optimizer family in the prereg, method agreement within 5 points replaces the 2 % seed rule |
 | 9f26cab | same model, full E1 protocol | dress rehearsal on `generated_rooms(1, 40)`, in two parts after an interruption (control room G1-29 identical) | prereg: H1 adjusted for width, technique families, method stability descriptive, time floor, fratricide reporting |
 | 78a88e6 | same model, rules of the pre-freeze checks committed first | scenario precision and H1 null calibration on the rehearsal rooms | 128 evaluation scenarios (`E1_CFG`), bootstrap p-value kept |
+| 25f8197 (tag `e1-prereg`) | frozen E1 plan | **confirmatory** study E1 on `generated_rooms(2026, 40)`, first and only evaluation of these rooms | none (report only) |
 
 **Rule from now on:** every report names its commit and its configuration (`config` in
 `results.json`). Changes to the model after the prereg freeze go only into a new, separately

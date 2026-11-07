@@ -44,6 +44,16 @@ python -m uv run killhouse-bench --quick --rooms M-center --out out/demo   # rep
 python -m uv run killhouse-apartment --seeds 5 --out out/apartment         # apartment + viewer3d.html
 ```
 
+## Result of the first confirmatory study (E1)
+
+Preregistered and frozen before the run ([PREREG_E1](docs/PREREG_E1_draft.md), tag `e1-prereg`),
+evaluated on 40 held-out rooms ([REPORT_E1](docs/REPORT_E1.md)). Both hypotheses passed, within
+this abstract model: the crisscross gap depends on the door position at equal room width
+(+10.7 points, CI 6.3-14.8), and crisscross has lower risk than buttonhook in 23 of 31 rooms
+where both are valid. Two optimizer families disagreed by more than 5 points in 35 % of the
+cases, so how a technique compares with the "best found" strategy still depends on the search
+method.
+
 ## Research state
 
 | document | content |
@@ -53,6 +63,7 @@ python -m uv run killhouse-apartment --seeds 5 --out out/apartment         # apa
 | [PARAMETERS](docs/PARAMETERS.md) | provenance of every model parameter (empirical / geometric / free) |
 | [PREREG_E1](docs/PREREG_E1_draft.md) | preregistration of study E1, frozen at tag `e1-prereg` |
 | [REPORT_M2](docs/REPORT_M2.md) | method check: reference cases with known solutions, seed x budget saturation |
+| [REPORT_E1](docs/REPORT_E1.md) | confirmatory study E1 on 40 held-out rooms |
 | [REPORT_G1_rehearsal](docs/REPORT_G1_rehearsal.md) | dress rehearsal of the planned study on 40 development rooms |
 | [RUNLOG](docs/RUNLOG.md) | which results were known at which model state |
 | [REVIEW_R1](docs/REVIEW_R1.md), [R2](docs/REVIEW_R2.md), [R3](docs/REVIEW_R3.md), [R4](docs/REVIEW_R4.md) | AI-assisted methodological reviews and responses |
