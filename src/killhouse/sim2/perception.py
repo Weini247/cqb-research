@@ -18,9 +18,12 @@ def in_view(
     pos: np.ndarray,
     attention: float,
     half_fov: float = HALF_FOV,
+    los: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Bool per point: in line of sight and inside the field of view around `attention`."""
-    los = vis[grid.see_index(pos)]
+    """Bool per point: in line of sight and inside the field of view around `attention`.
+    `los` overrides the matrix row, e.g. with closed doors taken out."""
+    if los is None:
+        los = vis[grid.see_index(pos)]
     ang = np.arctan2(q[:, 1] - pos[1], q[:, 0] - pos[0])
     return los & (np.abs((ang - attention + np.pi) % (2 * np.pi) - np.pi) <= half_fov)
 

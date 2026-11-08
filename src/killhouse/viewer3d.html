@@ -517,6 +517,8 @@ function loadTech(k) {
   const tc = m.t_clear == null ? "–" : m.t_clear.toFixed(1) + " s";
   $("metrics").innerHTML = `${OBJ === "coverage" ? "Abdeckung" : "Risiko"} <b>${m[OBJ].toFixed(3)}</b> · gesichert nach <b>${tc}</b>`
     + (m.fratricide != null ? ` · Fratricide ${m.fratricide.toFixed(1)} s` : ` · Dauer ${m.duration} s`)
+    + (OBJ === "coverage" && m.risk_multi != null ? ` · Risiko ${m.risk_multi.toFixed(3)}` : "")
+    + (m.doors_opened ? ` · ${m.doors_opened} Türen geöffnet` : "")
     + `${m.feasible ? "" : " · <span style='color:#ff8a80'>nicht vollständig gesichert</span>"}`
     + (ghostRep ? ` · Geist: ${ghostRep.name} (R ${ghostRep.metrics[OBJ].toFixed(3)})` : "");
   t = 0;
@@ -551,7 +553,8 @@ function setCam(mode, snap) {
   camMode = mode;
   ["oblique", "top", "follow", "cine"].forEach(c => $("cam-" + c).classList.toggle("on", c === mode));
   const R = room.room, E = extent(R), cx = (E.x0 + E.x1) / 2, cz = -(Math.max(E.y0, 0) + E.y1) / 2 + 0.8;
-  const span = (Math.max(E.x1 - E.x0, E.y1 - E.y0) + 3) / Math.min(1, camera.aspect * 1.25);
+  const aspect = camera.aspect > 0 ? camera.aspect : 1.6;
+  const span = (Math.max(E.x1 - E.x0, E.y1 - E.y0) + 3) / Math.min(1, aspect * 1.25);
   if (mode === "top") { camera.position.set(cx, span * 1.55, cz + 0.01); controls.target.set(cx, 0, cz); }
   else if (mode === "oblique" || snap) {
     camera.position.set(cx - span * 0.35, span * 0.95, cz + span * 1.05); controls.target.set(cx, 0, cz - 0.4);
@@ -606,7 +609,7 @@ function update(dtAnim) {
     $("agentinfo").innerHTML = `<span class="dot" style="background:${o.color}"></span> <b>${o.name}</b>`
       + ` · ${m.speed.toFixed(2)} m/s · Körper ${deg(m.heading).toFixed(0)}° · Aufmerksamkeit ${deg(m.attention).toFixed(0)}°`
       + (DOC.model.attention_equals_heading ? ` <span class="muted">(Modell v0.2: beides gleich)</span>` : "")
-      + (rep.mode ? ` · ${["geht", "wartet", "fertig"][rep.mode[sel][Math.min(k, rep.mode[sel].length - 1)]]}` : "")
+      + (rep.mode ? ` · ${["geht", "wartet", "fertig", "öffnet Tür"][rep.mode[sel][Math.min(k, rep.mode[sel].length - 1)]]}` : "")
       + (rep.known ? ` <span class="muted">· Punkte = Wissen dieser Figur</span>` : "");
   }
   draw(tc, k, kg, pct);
@@ -630,7 +633,7 @@ function runState(r, k, tc) {
 // one view, or two halves with the same camera: left the run, right the comparison run
 function draw(tc, k, kg, pct) {
   const W = canvas.clientWidth, H = canvas.clientHeight;
-  if (!(split && ghostRep)) {
+  if (!(split && ghostRep) || !W || !H) {
     renderer.setScissorTest(false); renderer.setViewport(0, 0, W, H); renderer.render(scene, camera); return;
   }
   const half = W / 2;
@@ -649,6 +652,7 @@ function draw(tc, k, kg, pct) {
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
+  if (!w || !h) return;  // a hidden page has no size; 0/0 would poison the camera with NaN
   renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);

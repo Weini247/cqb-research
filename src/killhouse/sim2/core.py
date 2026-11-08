@@ -1,7 +1,10 @@
 """Closed-loop loop of model v0.3: perceive, exchange delayed messages, decide, move.
 
-`killhouse-search` runs it on generated apartments (all interior doors open in this first
-version) and writes results.json plus a viewer with each agent's knowledge.
+`killhouse-search` runs it on generated apartments or houses, with doors that start closed and
+have to be opened, and writes results.json plus a viewer with each agent's knowledge. Afterwards
+each run is scored with the abstract threat model of the apartment study (`clearing`): hidden
+threats that react and hit at a rate. The agents themselves do not react to threats; the risk
+only measures how exposed the search was.
 """
 
 from __future__ import annotations
@@ -15,12 +18,12 @@ from pathlib import Path
 import numpy as np
 
 from ..apartment import Apartment, generate_apartment
-from ..clearing import door_xy
+from ..clearing import OPEN_TIME, Episode, closed_door_masks, door_xy, evaluate_episode
 from ..entry import CLEAR_FRAC, DT, HALF_FOV
 from ..geom import Grid, reachable, visibility, visibility_fast
 from ..house import generate_house
 from ..team import Operator, default_team
-from .agents import HOLD, MOVE, WAIT, AgentState, Limits, turn_towards, wrap
+from .agents import HOLD, MOVE, OPEN, WAIT, AgentState, Limits, turn_towards, wrap
 from .perception import DWELL_STEPS, in_view
 from .policy import attention_goal, choose_target
 
@@ -55,19 +58,22 @@ class Scenario:
     grid: Grid
     q: np.ndarray
     vis: np.ndarray
+    closed: dict[int, np.ndarray] = field(default_factory=dict)  # door -> sight lines it blocks
 
 
-def scenario(seed: int, building: str = "apartment") -> Scenario:
-    """A generated apartment or house (all interior doors open) with its visibility matrix."""
+def scenario(seed: int, building: str = "apartment", closed_frac: float = 0.0) -> Scenario:
+    """A generated apartment or house with its visibility matrix and closed-door masks."""
     if building == "house":
-        ap = generate_house(seed)
+        ap = generate_house(seed, closed_frac=closed_frac)
         grid = Grid(ap.fp)
         q = ap.fp.points()
-        return Scenario(ap, grid, q, visibility_fast(ap.fp, grid, q))
-    ap = generate_apartment(seed, closed_frac=0.0)
-    grid = Grid(ap.fp)
-    q = ap.fp.points()
-    return Scenario(ap, grid, q, visibility(ap.fp, grid, q))
+        vis = visibility_fast(ap.fp, grid, q)
+    else:
+        ap = generate_apartment(seed, closed_frac=closed_frac)
+        grid = Grid(ap.fp)
+        q = ap.fp.points()
+        vis = visibility(ap.fp, grid, q)
+    return Scenario(ap, grid, q, vis, closed_door_masks(ap, grid, q))
 
 
 def start_positions(sc: Scenario, n: int) -> np.ndarray:
@@ -95,8 +101,26 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
     starts = start_positions(sc, n)
     allowed = reachable(g, starts[0])  # pockets behind furniture or door leaves are no targets
     cand = np.nonzero(allowed)[0]
-    visf = vis[cand].astype(np.float32)
     boxes = np.array(sc.ap.fp.blockers, float)
+    # doors: closed ones block sight until an agent has spent OPEN_TIME at them; everybody
+    # knows the floorplan and which doors are still closed
+    closed = dict(sc.closed)
+    gaps = {di: np.array(sc.ap.doors[di].gap) for di in closed}
+    door_open: dict[int, float] = {}
+    open_steps = int(round(OPEN_TIME / DT))
+    state = {}
+
+    def doors_changed():
+        block = np.zeros_like(vis)
+        for mk in closed.values():
+            block |= mk
+        state["block"] = block
+        state["visf"] = (vis[cand] & ~block[cand]).astype(np.float32)
+
+    doors_changed()
+
+    def gap_dist(p: np.ndarray, b: np.ndarray) -> float:
+        return float(np.hypot(max(b[0] - p[0], 0, p[0] - b[2]), max(b[1] - p[1], 0, p[1] - b[3])))
 
     def clearance(p: np.ndarray) -> float:
         """Distance from a body centre to the nearest wall, door leaf or furniture."""
@@ -184,8 +208,9 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
         for i, a in enumerate(agents):
             op = team[i]
             # 2. perceive with the attention direction of the previous step
-            los = vis[g.see_index(a.pos)]
-            a.dwell += in_view(g, vis, q, a.pos, a.attention)
+            c = g.see_index(a.pos)
+            los = vis[c] & ~state["block"][c]
+            a.dwell += in_view(g, vis, q, a.pos, a.attention, los=los)
             new = np.nonzero((a.dwell >= DWELL_STEPS) & (own[i] > steps))[0]
             own[i, new] = k
             fresh = new[~a.known[new]]
@@ -198,13 +223,21 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
                     avoid[i].append(g.centers[a.target].copy())
                     a.next_plan = k
                 anchor[i] = a.pos.copy()
-            if k < a.yield_until:
+            if a.mode == OPEN and k >= a.open_until:
+                if a.opening in closed:  # the door is open from now on, for everybody
+                    del closed[a.opening]
+                    door_open[a.opening] = round(k * DT, 1)
+                    doors_changed()
+                a.mode, a.opening = MOVE, -1
+            if a.mode == OPEN:
+                pass  # still opening the door
+            elif k < a.yield_until:
                 pass  # giving way: keep the yield path, decide again afterwards
             elif a.known.mean() >= 1 - CLEAR_FRAC:
                 a.mode, a.path, a.target = HOLD, [], -1
             elif k >= a.next_plan or not a.path:
                 j = choose_target(
-                    a, cand, g.centers, visf, list(claims[i].values()) + avoid[i][-3:]
+                    a, cand, g.centers, state["visf"], list(claims[i].values()) + avoid[i][-3:]
                 )
                 if j < 0:
                     a.mode, a.path, a.target = HOLD, [], -1
@@ -218,7 +251,9 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
                 inbox.append((k + lag, i, fresh, tgt))
             # 4. move within the speed, acceleration and turn limits
             goal_att = attention_goal(a, los, q, lim)
-            if a.mode != HOLD and a.path:
+            if a.mode == OPEN:
+                a.speed = 0.0
+            elif a.mode != HOLD and a.path:
                 wp = a.path[0]
                 want = math.atan2(wp[1] - a.pos[1], wp[0] - a.pos[0])
                 a.heading = turn_towards(a.heading, want, lim.body_turn * DT)
@@ -245,7 +280,18 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
                     walled = c < CONTACT * op.radius_m and c < here - 1e-9
                     if not blockers and not walled:
                         break
-                if walled and not blockers:
+                at_door = next(
+                    (
+                        di
+                        for di, b in gaps.items()
+                        if di in closed and gap_dist(nxt, b) < 0.5 * op.radius_m
+                    ),
+                    None,
+                )
+                if at_door is not None and not blockers:  # a closed door ahead: open it first
+                    a.mode, a.speed, a.opening = OPEN, 0.0, at_door
+                    a.open_until = k + open_steps
+                elif walled and not blockers:
                     a.mode, a.speed, a.waited = WAIT, 0.0, a.waited + 1
                     if a.waited * DT >= MAX_WAIT:
                         a.next_plan, a.waited = k + 1, 0
@@ -280,6 +326,9 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
     need = int(math.ceil((1 - CLEAR_FRAC) * m))
     t_clear = cover[need - 1] * DT if cover[need - 1] <= t_end else None
     know_all = [np.sort(first_known[i])[need - 1] for i in range(n)]
+    # threat model of the apartment study, on the attention directions (where agents look)
+    ep = Episode(params.label, np.array(pos), np.array(att), door_open=dict(door_open))
+    threat = evaluate_episode(sc.ap, ep, g, vis, q, closed_masks=sc.closed)
     return {
         "name": params.label,
         "metrics": {
@@ -288,6 +337,10 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
             "t_all_know": round(float(max(know_all)) * DT, 1) if max(know_all) <= t_end else None,
             "duration": round(t_end * DT, 1),
             "feasible": t_clear is not None,
+            "risk": threat["risk"],
+            "risk_multi": threat["risk_multi"],
+            "exposure": threat["exposure"],
+            "doors_opened": len(door_open),
         },
         "pos": np.round(np.array(pos), 4).tolist(),
         "gaze": np.round(np.array(head), 4).tolist(),
@@ -296,17 +349,22 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
         "first_seen": first_seen.tolist(),
         "first_known": np.minimum(first_known, t_end + 1).tolist(),
         "own_seen": np.minimum(own, t_end + 1).tolist(),
-        "door_open": [],
+        "door_open": [door_open.get(di, -1.0) for di in range(len(sc.ap.doors))],
+        "markers": threat["_markers"],
     }
 
 
 def results(
-    seeds: list[int], delays: list[float | None], team=None, building: str = "apartment"
+    seeds: list[int],
+    delays: list[float | None],
+    team=None,
+    building: str = "apartment",
+    closed_frac: float = 0.0,
 ) -> dict:
     team = team or default_team()
     rooms = []
     for seed in seeds:
-        sc = scenario(seed, building)
+        sc = scenario(seed, building, closed_frac)
         horizon = 240.0 if building == "house" else 120.0  # houses take longer
         runs = [run_search(sc, team, SearchParams(delay=d, max_time=horizon)) for d in delays]
         rooms.append(
@@ -342,10 +400,11 @@ def main(argv: list[str] | None = None) -> None:
         help="message delays in seconds, 'none' = no communication",
     )
     ap.add_argument("--building", choices=("apartment", "house"), default="apartment")
+    ap.add_argument("--closed", type=float, default=0.6, help="share of doors closed at the start")
     ap.add_argument("--out", type=Path, default=Path("out/search"))
     a = ap.parse_args(argv)
     delays = [None if d == "none" else float(d) for d in a.delays]
-    data = results(a.seeds, delays, building=a.building)
+    data = results(a.seeds, delays, building=a.building, closed_frac=a.closed)
     for r in data["rooms"]:
         for rp in r["replays"]:
             print(f"{r['room']['name']} {rp['name']:24s} {rp['metrics']}")

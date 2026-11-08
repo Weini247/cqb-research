@@ -136,9 +136,13 @@ def _walls(cells: list[Box], gaps: dict) -> list[Box]:
     return out
 
 
-def generate_house(seed: int = 0, kind: str | None = None, attempts: int = 30) -> Apartment:
+def generate_house(
+    seed: int = 0, kind: str | None = None, attempts: int = 30, closed_frac: float = 0.0
+) -> Apartment:
     """Reproducible house for `seed`. Every room must be reachable from the entrance for a body;
-    a layout that fails (a leaf or a cupboard in the way) is drawn again from a derived seed."""
+    a layout that fails (a leaf or a cupboard in the way) is drawn again from a derived seed.
+    closed_frac: probability that a door is closed at the start (the entrance always is then);
+    open-plan openings have no door."""
     kind = kind or ("spine", "tee")[seed % 2]
     for attempt in range(attempts):
         try:
@@ -146,6 +150,11 @@ def generate_house(seed: int = 0, kind: str | None = None, attempts: int = 30) -
         except RuntimeError:
             continue
         if all_rooms_reachable(house):
+            rng_doors = np.random.default_rng([seed, 7])
+            for d in house.doors:
+                d.closed = bool(
+                    closed_frac > 0 and (d.frm == -1 or rng_doors.uniform() < closed_frac)
+                )
             return house
     raise RuntimeError(f"no valid house for seed {seed}")
 

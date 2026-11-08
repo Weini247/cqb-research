@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-MOVE, WAIT, HOLD = 0, 1, 2  # motion modes, exported per step
+MOVE, WAIT, HOLD, OPEN = 0, 1, 2, 3  # motion modes, exported per step
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,8 @@ class AgentState:
     waited: int = 0  # consecutive steps spent waiting for a teammate
     next_plan: int = 0  # step of the next scheduled replan
     yield_until: int = -1  # while k < yield_until the agent walks out of a teammate's way
+    open_until: int = -1  # while k < open_until the agent opens door `opening`
+    opening: int = -1
 
     def clamp_attention(self, lim: Limits) -> None:
         rel = wrap(self.attention - self.heading)

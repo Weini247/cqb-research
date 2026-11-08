@@ -13,6 +13,8 @@ its own study.
 | knowledge | team view only | per agent: own sight (field of view around attention, line of sight, 0.3 s dwell) plus messages |
 | communication | none | messages with a fixed delay (0 s, 1 s, or none) carrying newly seen points and the agent's target |
 | bodies | collision counted afterwards | agents wait, side-step or give way; bodies may brush (85 % of the summed radii, also against walls) |
+| doors | apartments: closed doors opened on a schedule | closed doors block sight until an agent has spent 0.8 s at them; then open for everybody |
+| threats | duel model, primary outcome | same abstract duel model (apartment configuration), scored afterwards on the attention directions; agents do not react to threats |
 
 ## Decisions (scripted rules, not a model of a real procedure)
 
@@ -44,7 +46,14 @@ moved). Field of view, dwell and clearing threshold are taken from E1 (`entry.py
 
 ## Known limitations
 
-- Interior doors are all open in this version (no door opening yet).
+- Door states are known to every agent (they are physical, not part of the knowledge model), the
+  door leaf stays drawn in its open position also while the door is closed, and nobody closes a
+  door again.
+- Threats are scored, not simulated: they do not move and the agents neither see them as such
+  nor react. Risk saturates near 0.9-1.0 for long searches in this abstract model, so it
+  separates runs poorly; coverage time is the more informative outcome.
+- With 60 % closed doors (4 apartments, 4 houses, messages after 1 s or none), 15 of 16 runs
+  reached 99.5 % coverage; every closed door on the way was opened.
 - Houses (`--building house`): on 12 generated houses x 2 conditions (messages after 1 s, none)
   all 24 runs reached 99.5 % coverage within 240 s; with messages the team needed 31-75 s,
   without 70-162 s. Exploratory, development seeds only.

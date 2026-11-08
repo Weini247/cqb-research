@@ -21,7 +21,7 @@ Version 1 belonged to the removed spike-1 prototype.
 - `scenes[]`: `environment` (room or apartment geometry), `points` (threat positions), `runs[]`.
 - `runs[]`: `steps`, `metrics`, per agent `x`, `y`, `heading`, `attention` (one value per step),
   optional `first_known` (step at which this agent knew each point, model v0.3) and `mode`
-  (0 moving, 1 waiting, 2 done),
+  (0 moving, 1 waiting, 2 done, 3 opening a door),
   `first_seen` (step at which each point was first seen), `markers`, `events` (`cleared`,
   `door_open`, sorted by time).
 

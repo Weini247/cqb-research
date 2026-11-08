@@ -2,6 +2,13 @@
 
 ## Unreleased (v0.2.1 and v0.3-a to v0.3-d; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
 
+- sim2 doors and threats: doors start closed (`--closed`, default 0.6), block sight until an
+  agent has opened them (0.8 s, mode `öffnet Tür`); every run is scored afterwards with the
+  abstract threat model of the apartment study (risk, exposure, one sample placement as
+  markers). Agents do not react to threats. Houses accept `closed_frac`.
+- Viewer: risk and opened doors in the header, door states over time; guard against a zero-size
+  window that set the camera to NaN.
+
 - House generator `house.py` (v0.3-d): single-floor houses with 8-12 rooms plus hallways, two
   topologies (long hallway, entry hall with cross corridor), spanning-tree doors, extra doors
   and open-plan openings, wall and free-standing furniture, walls derived once from the room

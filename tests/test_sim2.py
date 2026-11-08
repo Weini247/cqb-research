@@ -5,11 +5,12 @@ import math
 import numpy as np
 import pytest
 
+from killhouse.clearing import OPEN_TIME
 from killhouse.entry import DT
 from killhouse.replay import from_results, validate
-from killhouse.sim2.agents import Limits
+from killhouse.sim2.agents import OPEN, Limits
 from killhouse.sim2.core import CONTACT, SearchParams, results, run_search, scenario
-from killhouse.sim2.perception import sight_steps
+from killhouse.sim2.perception import DWELL_STEPS, in_view, sight_steps
 from killhouse.team import default_team
 
 TEAM = default_team()
@@ -99,3 +100,47 @@ def test_export_is_a_valid_replay_with_knowledge_and_separate_attention():
     a = doc["scenes"][0]["runs"][0]["agents"][0]
     assert len(a["first_known"]) == len(doc["scenes"][0]["points"]) and "mode" in a
     assert a["attention"] != a["heading"]
+
+
+# ---- closed doors and threat scoring ----
+
+
+@pytest.fixture(scope="module")
+def door_run():
+    sc = scenario(2, closed_frac=0.6)
+    return sc, run_search(sc, TEAM, SearchParams(delay=1.0))
+
+
+def test_closed_doors_block_sight_until_an_agent_opened_them(door_run):
+    sc, r = door_run
+    assert sc.closed and r["metrics"]["doors_opened"] >= 1
+    pos, att = np.array(r["pos"]), np.array(r["attention"])
+    opened = {di: t for di, t in enumerate(r["door_open"]) if t >= 0}
+    for i in range(len(TEAM)):
+        count = np.zeros(len(sc.q), int)
+        first = np.full(len(sc.q), len(pos))
+        for k in range(1, len(pos)):
+            c = sc.grid.see_index(pos[k - 1, i])
+            los = sc.vis[c].copy()
+            for di, mk in sc.closed.items():
+                if di not in opened or k <= round(opened[di] / DT):
+                    los &= ~mk[c]
+            count += in_view(sc.grid, sc.vis, sc.q, pos[k - 1, i], att[k - 1, i], los=los)
+            first[(count >= DWELL_STEPS) & (first == len(pos))] = k
+        assert np.mean(np.abs(first - np.array(r["own_seen"][i])) <= 1) >= 0.98
+
+
+def test_a_door_opens_only_after_an_agent_spent_the_opening_time_at_it(door_run):
+    sc, r = door_run
+    modes = np.array(r["mode"])
+    need = round(OPEN_TIME / DT)
+    for t in (t for t in r["door_open"] if t >= 0):
+        k = round(t / DT)
+        assert (modes[:, k - need : k] == OPEN).all(axis=1).any()
+
+
+def test_threat_scores_and_markers_are_exported(door_run):
+    _, r = door_run
+    m = r["metrics"]
+    assert 0 <= m["risk"] <= 1 and 0 <= m["risk_multi"] <= 1 and m["exposure"] >= 0
+    assert r["markers"] and {"x", "y", "t_detect", "t_id"} <= set(r["markers"][0])
