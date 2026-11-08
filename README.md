@@ -22,6 +22,11 @@ knows (green), with messages after 1 s (left) and without communication (right).
 
 ![knowledge](docs/media/knowledge-split.gif)
 
+Generated houses with 8-12 rooms (v0.3-d): four agents search a house with furniture and an
+open-plan living area, messages after 1 s.
+
+![house](docs/media/house-search.gif)
+
 ## Result of the first confirmatory study (E1)
 
 Preregistered and frozen before the run ([PREREG_E1](docs/PREREG_E1_draft.md), tag `e1-prereg`),

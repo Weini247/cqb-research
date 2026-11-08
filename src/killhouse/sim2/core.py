@@ -17,7 +17,8 @@ import numpy as np
 from ..apartment import Apartment, generate_apartment
 from ..clearing import door_xy
 from ..entry import CLEAR_FRAC, DT, HALF_FOV
-from ..geom import Grid, visibility
+from ..geom import Grid, reachable, visibility, visibility_fast
+from ..house import generate_house
 from ..team import Operator, default_team
 from .agents import HOLD, MOVE, WAIT, AgentState, Limits, turn_towards, wrap
 from .perception import DWELL_STEPS, in_view
@@ -56,7 +57,13 @@ class Scenario:
     vis: np.ndarray
 
 
-def scenario(seed: int) -> Scenario:
+def scenario(seed: int, building: str = "apartment") -> Scenario:
+    """A generated apartment or house (all interior doors open) with its visibility matrix."""
+    if building == "house":
+        ap = generate_house(seed)
+        grid = Grid(ap.fp)
+        q = ap.fp.points()
+        return Scenario(ap, grid, q, visibility_fast(ap.fp, grid, q))
     ap = generate_apartment(seed, closed_frac=0.0)
     grid = Grid(ap.fp)
     q = ap.fp.points()
@@ -85,9 +92,10 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
     steps = int(round(params.max_time / DT))
     lag = None if params.delay is None else max(1, int(round(params.delay / DT)))
     door = door_xy(sc.ap.entrance)
-    cand = np.nonzero(g.walk_free)[0]
+    starts = start_positions(sc, n)
+    allowed = reachable(g, starts[0])  # pockets behind furniture or door leaves are no targets
+    cand = np.nonzero(allowed)[0]
     visf = vis[cand].astype(np.float32)
-    allowed = np.ones(len(g.centers), bool)
     boxes = np.array(sc.ap.fp.blockers, float)
 
     def clearance(p: np.ndarray) -> float:
@@ -97,7 +105,7 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
         return float(np.hypot(dx, dy).min())
 
     agents = []
-    for p in start_positions(sc, n):
+    for p in starts:
         h = math.atan2(door[1] - p[1], door[0] - p[0])
         agents.append(AgentState(p.copy(), h, h, known=np.zeros(m, bool), dwell=np.zeros(m, int)))
     own = np.full((n, m), steps + 1)  # step of own first sight
@@ -292,12 +300,15 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
     }
 
 
-def results(seeds: list[int], delays: list[float | None], team=None) -> dict:
+def results(
+    seeds: list[int], delays: list[float | None], team=None, building: str = "apartment"
+) -> dict:
     team = team or default_team()
     rooms = []
     for seed in seeds:
-        sc = scenario(seed)
-        runs = [run_search(sc, team, SearchParams(delay=d)) for d in delays]
+        sc = scenario(seed, building)
+        horizon = 240.0 if building == "house" else 120.0  # houses take longer
+        runs = [run_search(sc, team, SearchParams(delay=d, max_time=horizon)) for d in delays]
         rooms.append(
             {
                 "room": {**sc.ap.to_dict(), "kind": "apartment"},
@@ -330,10 +341,11 @@ def main(argv: list[str] | None = None) -> None:
         default=["0", "1", "none"],
         help="message delays in seconds, 'none' = no communication",
     )
+    ap.add_argument("--building", choices=("apartment", "house"), default="apartment")
     ap.add_argument("--out", type=Path, default=Path("out/search"))
     a = ap.parse_args(argv)
     delays = [None if d == "none" else float(d) for d in a.delays]
-    data = results(a.seeds, delays)
+    data = results(a.seeds, delays, building=a.building)
     for r in data["rooms"]:
         for rp in r["replays"]:
             print(f"{r['room']['name']} {rp['name']:24s} {rp['metrics']}")

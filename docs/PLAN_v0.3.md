@@ -152,7 +152,7 @@ Effort in working sessions of a few hours, rough.
   determinism by seed; knowledge exported per tick.
 - **Demo:** viewer shows what each agent knows (fog per agent).
 
-### v0.3-d Larger buildings (3 sessions)
+### v0.3-d Larger buildings (3 sessions) - first version done (house.py, visibility_fast)
 - **Scope:** Floorplan v2, a topology-first generator (room graph -> layout) for houses with 8-15
   rooms and open areas, furniture families, scalable visibility (on-demand ray casting with a
   cache instead of the dense matrix).

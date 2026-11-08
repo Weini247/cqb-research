@@ -161,6 +161,32 @@ class Grid:
         return [np.asarray(start, float)] + keep[1:] + [np.asarray(goal, float)]
 
 
+def reachable(g: Grid, start: np.ndarray) -> np.ndarray:
+    """Walkable cells connected to `start` (8-neighbourhood without cutting corners, as A*)."""
+    ok, nx = g.walk_free, g.nx
+    seen = np.zeros(len(ok), bool)
+    s = int(g.index(start))
+    seen[s], todo = True, [s]
+    while todo:
+        c = todo.pop()
+        cx, cy = c % nx, c // nx
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                x, y = cx + dx, cy + dy
+                if not (dx or dy) or not (0 <= x < nx and 0 <= y < g.ny):
+                    continue
+                n = y * nx + x
+                if (
+                    seen[n]
+                    or not ok[n]
+                    or (dx and dy and not (ok[cy * nx + x] and ok[y * nx + cx]))
+                ):
+                    continue
+                seen[n] = True
+                todo.append(n)
+    return seen
+
+
 def visibility(fp: Floorplan, grid: Grid, q: np.ndarray, chunk: int = 256) -> np.ndarray:
     """Bool matrix (cells, points): free observer cell has line of sight to threat point."""
     vis = np.zeros((len(grid.centers), len(q)), bool)
@@ -168,4 +194,28 @@ def visibility(fp: Floorplan, grid: Grid, q: np.ndarray, chunk: int = 256) -> np
     for k in range(0, len(idx), chunk):
         sl = idx[k : k + chunk]
         vis[sl] = los_boxes(grid.centers[sl], q, fp.blockers)
+    return vis
+
+
+def visibility_fast(fp: Floorplan, grid: Grid, q: np.ndarray, chunk: int = 1024) -> np.ndarray:
+    """Same matrix as `visibility`, computed on the GPU in float64 when PyTorch with CUDA is
+    available (houses have several thousand cells x points); otherwise falls back to numpy.
+    Tested for equality with `visibility` in tests/test_house.py."""
+    from . import fastsim
+
+    if not fastsim.available() or fastsim.device().type != "cuda":
+        return visibility(fp, grid, q)
+    torch, dev = fastsim.torch, fastsim.device()
+    vis = np.zeros((len(grid.centers), len(q)), bool)
+    idx = np.nonzero(grid.see_free)[0]
+    qt = torch.tensor(q, dtype=torch.float64, device=dev)
+    qx, qy = qt[None, :, 0], qt[None, :, 1]
+    for k in range(0, len(idx), chunk):
+        sl = idx[k : k + chunk]
+        p = torch.tensor(grid.centers[sl], dtype=torch.float64, device=dev)
+        px, py = p[:, 0, None], p[:, 1, None]
+        ok = torch.ones((len(sl), len(q)), dtype=torch.bool, device=dev)
+        for b in fp.blockers:
+            ok &= ~fastsim._seg_hits_box(px, py, qx, qy, b)
+        vis[sl] = ok.cpu().numpy()
     return vis

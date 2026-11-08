@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased (v0.2.1, v0.3-a, v0.3-b, v0.3-c; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+## Unreleased (v0.2.1 and v0.3-a to v0.3-d; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+
+- House generator `house.py` (v0.3-d): single-floor houses with 8-12 rooms plus hallways, two
+  topologies (long hallway, entry hall with cross corridor), spanning-tree doors, extra doors
+  and open-plan openings, wall and free-standing furniture, walls derived once from the room
+  rectangles; every room is guaranteed reachable (derived seed otherwise). `killhouse-search
+  --building house`.
+- `geom.visibility_fast`: the same visibility matrix on the GPU in float64 (0.6 s instead of
+  16 s for a house), tested for equality; `geom.reachable`.
 
 - Model v0.3 `sim2` ([docs/MODEL_SIM2.md](docs/MODEL_SIM2.md), `killhouse-search`): closed-loop
   agents with separate body heading and attention, per-agent knowledge, delayed messages,
