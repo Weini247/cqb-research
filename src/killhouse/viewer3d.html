@@ -399,6 +399,7 @@ function buildWalls() {
     const height = { wall: H, door: Math.min(2.0, H), crate: Math.min(1.8, H), window: Math.min(1.0, H) };
     // typed furniture carries its own height; it is drawn at full height regardless of the wall slider
     const wallTex = R.style === "trainhouse" ? "plywood" : "wall";
+    wallBoxes = R.boxes.filter(b => b[4] === "wall");
     R.boxes.forEach(([x0, y0, x1, y1, kind, h]) => wallGroup.add(h != null
       ? furniture(kind, x0, y0, x1, y1, h)
       : box(x0, y0, x1, y1, 0, height[kind], kind === "door" || kind === "window" || kind === "wall" ? wallTex : kind)));
@@ -436,17 +437,190 @@ function buildWalls() {
   add(-ext, back - T, w + ext, back, 0, Math.min(H, 1.0), "wall");
 }
 
-// typed furniture (residence generator): a simple solid per kind, coloured by material
-const FURN = { barrier: 0x6b6f75, partition: 0xcdb08a, bed: 0x8fa3c4, sofa: 0x7d8f7a, table: 0xa8835a, desk: 0xa8835a, counter: 0xd9d4cc,
-  island: 0xd9d4cc, wardrobe: 0xc9b79c, shelf: 0xb89a74, fridge: 0xe6e8ea, car: 0x9aa4b0, bath: 0xf2f4f5,
-  cabinet: 0xc9b79c };
+// ---------- furniture shapes (own low-poly code, no external models) ----------
+// Each piece fills exactly its simulated footprint and height; only the look is added.
+const MAT = {};
+function mat(color, rough = 0.7, metal = 0) {
+  const key = `${color}-${rough}-${metal}`;
+  return MAT[key] ??= new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
+}
+const WOOD = 0xa8835a, LIGHT_WOOD = 0xc9a77c, WHITE = 0xeeeeea, DARK = 0x3a3d42, FABRIC = 0x7d8f7a;
+// plan box (x0, y0, x1, y1) between heights z0 and z1, added to group g
+function part(g, x0, y0, x1, y1, z0, z1, m) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, z1 - z0, y1 - y0), m);
+  mesh.position.set((x0 + x1) / 2, (z0 + z1) / 2, -(y0 + y1) / 2);
+  mesh.castShadow = mesh.receiveShadow = true;
+  g.add(mesh);
+  return mesh;
+}
+// sub-box of b along one side, `depth` deep (side: 0 bottom, 1 top, 2 left, 3 right)
+function strip(b, side, depth) {
+  const [x0, y0, x1, y1] = b;
+  return [[x0, y0, x1, y0 + depth], [x0, y1 - depth, x1, y1], [x0, y0, x0 + depth, y1], [x1 - depth, y0, x1, y1]][side];
+}
+function inset(b, d) { return [b[0] + d, b[1] + d, b[2] - d, b[3] - d]; }
+let wallBoxes = [];
+// the side of a piece that faces the nearest wall (its back), optionally among some sides only
+function backSide(b, sides = [0, 1, 2, 3]) {
+  const [x0, y0, x1, y1] = b, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const probes = [[cx, y0 - 0.15], [cx, y1 + 0.15], [x0 - 0.15, cy], [x1 + 0.15, cy]];
+  const dist = ([px, py]) => Math.min(...wallBoxes.map(([a0, b0, a1, b1]) =>
+    Math.hypot(Math.max(a0 - px, 0, px - a1), Math.max(b0 - py, 0, py - b1))));
+  return sides.reduce((best, sd) => (dist(probes[sd]) < dist(probes[best]) ? sd : best), sides[0]);
+}
+const opposite = s => [1, 0, 3, 2][s];
+
+const BUILD = {
+  bed(g, b, h) {
+    const long = (b[2] - b[0]) > (b[3] - b[1]);
+    // headboard on the short side nearer to a wall (beds stand head against a wall)
+    const head = backSide(b, long ? [2, 3] : [0, 1]);
+    part(g, ...b, 0, h * 0.55, mat(LIGHT_WOOD));
+    part(g, ...inset(b, 0.04), h * 0.55, h, mat(WHITE, 0.9));
+    part(g, ...strip(inset(b, 0.04), opposite(head), (long ? b[2] - b[0] : b[3] - b[1]) * 0.62), h * 0.95, h + 0.04, mat(0x8fa3c4, 0.9));
+    part(g, ...strip(b, head, 0.08), 0, h + 0.45, mat(WOOD));
+    part(g, ...strip(inset(b, 0.12), head, 0.35), h, h + 0.1, mat(WHITE, 0.95));
+  },
+  sofa(g, b, h) {
+    const back = backSide(b);
+    part(g, ...b, 0, h * 0.5, mat(FABRIC, 0.95));
+    part(g, ...strip(b, back, 0.22), h * 0.5, h, mat(FABRIC, 0.95));
+    const ends = back <= 1 ? [2, 3] : [0, 1];
+    ends.forEach(s => part(g, ...strip(b, s, 0.18), h * 0.5, h * 0.75, mat(FABRIC, 0.95)));
+  },
+  table(g, b, h) {
+    part(g, ...b, h - 0.04, h, mat(WOOD, 0.5));
+    const [x0, y0, x1, y1] = inset(b, 0.06);
+    [[x0, y0], [x1 - 0.05, y0], [x0, y1 - 0.05], [x1 - 0.05, y1 - 0.05]].forEach(([x, y]) =>
+      part(g, x, y, x + 0.05, y + 0.05, 0, h - 0.04, mat(WOOD, 0.5)));
+  },
+  desk(g, b, h) {
+    part(g, ...b, h - 0.04, h, mat(LIGHT_WOOD, 0.5));
+    const along = backSide(b) <= 1 ? [2, 3] : [0, 1];
+    along.forEach(s => part(g, ...strip(b, s, 0.04), 0, h - 0.04, mat(LIGHT_WOOD, 0.5)));
+  },
+  counter(g, b, h) {
+    const back = backSide(b);
+    part(g, ...b, 0.1, h - 0.04, mat(WHITE, 0.4));
+    part(g, ...b, h - 0.04, h, mat(0x5b5f66, 0.3));
+    part(g, ...inset(b, 0.05), 0, 0.1, mat(DARK));
+    part(g, ...strip(b, back, 0.02), h, h + 0.5, mat(0xdfe3e6, 0.3));  // splashback
+  },
+  island(g, b, h) {
+    part(g, ...inset(b, 0.12), 0, h - 0.04, mat(WHITE, 0.4));
+    part(g, ...b, h - 0.04, h, mat(0x5b5f66, 0.3));
+  },
+  wardrobe(g, b, h) {
+    const front = opposite(backSide(b));
+    part(g, ...b, 0, h, mat(0xd8d2c8, 0.6));
+    part(g, ...strip(b, front, 0.01), 0.05, h - 0.05, mat(0xcfc7ba, 0.5));
+    const s = strip(b, front, 0.02), mid = front <= 1 ? [(s[0] + s[2]) / 2 - 0.01, s[1], (s[0] + s[2]) / 2 + 0.01, s[3]]
+                                                        : [s[0], (s[1] + s[3]) / 2 - 0.01, s[2], (s[1] + s[3]) / 2 + 0.01];
+    part(g, ...mid, 0.05, h - 0.05, mat(DARK));
+  },
+  shelf(g, b, h) {
+    const back = backSide(b);
+    part(g, ...strip(b, back, 0.03), 0, h, mat(LIGHT_WOOD));
+    (back <= 1 ? [2, 3] : [0, 1]).forEach(s => part(g, ...strip(b, s, 0.03), 0, h, mat(LIGHT_WOOD)));
+    for (let z = 0; z <= h; z += h / 4) part(g, ...b, Math.min(z, h - 0.03), Math.min(z, h - 0.03) + 0.03, mat(LIGHT_WOOD));
+  },
+  fridge(g, b, h) {
+    part(g, ...b, 0, h, mat(0xe6e8ea, 0.3, 0.2));
+    const front = opposite(backSide(b));
+    part(g, ...strip(b, front, 0.012), h * 0.62, h * 0.63, mat(DARK));
+  },
+  cabinet(g, b, h) { part(g, ...b, 0, h, mat(0xd8d2c8, 0.6)); part(g, ...b, h - 0.03, h, mat(LIGHT_WOOD)); },
+  bath(g, b, h) {
+    part(g, ...b, 0, h, mat(0xf4f6f7, 0.2));
+    part(g, ...inset(b, 0.08), h - 0.02, h + 0.001, mat(0xbcd3dd, 0.1));
+  },
+  car(g, b, h) {
+    const long = (b[3] - b[1]) > (b[2] - b[0]);
+    const colours = [0x9aa4b0, 0xb3332e, 0xe8e8e6, 0x2f4f6f];
+    const body = mat(colours[Math.round(Math.abs(b[0] * 7 + b[1] * 3)) % colours.length], 0.35, 0.4);
+    const glass = mat(0x6d8394, 0.15, 0.3), tyre = mat(0x1f2124, 0.9);
+    const [x0, y0, x1, y1] = b, L = long ? y1 - y0 : x1 - x0;
+    part(g, ...inset(b, 0.02), 0.25, h * 0.5, body);  // lower body
+    // cabin: glass band between the lower body and a roof, set back from both ends
+    const cab = long ? [x0 + 0.14, y0 + L * 0.3, x1 - 0.14, y0 + L * 0.74] : [x0 + L * 0.3, y0 + 0.14, x0 + L * 0.74, y1 - 0.14];
+    part(g, ...cab, h * 0.5, h * 0.9, glass);
+    part(g, ...inset(cab, -0.02), h * 0.9, h, body);  // roof
+    const bonnet = long ? [x0 + 0.06, y0 + 0.1, x1 - 0.06, y0 + L * 0.3] : [x0 + 0.1, y0 + 0.06, x0 + L * 0.3, y1 - 0.06];
+    part(g, ...bonnet, h * 0.5, h * 0.56, body);
+    const r = 0.32, ws = long ? [[x0, y0 + 0.75], [x1, y0 + 0.75], [x0, y1 - 0.75], [x1, y1 - 0.75]]
+                               : [[x0 + 0.75, y0], [x0 + 0.75, y1], [x1 - 0.75, y0], [x1 - 0.75, y1]];
+    ws.forEach(([x, y]) => {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.22, 16), tyre);
+      w.rotation[long ? "z" : "x"] = Math.PI / 2;
+      w.position.set(x + (long ? (x === x0 ? 0.12 : -0.12) : 0), r, -(y + (long ? 0 : (y === y0 ? 0.12 : -0.12))));
+      w.castShadow = true; g.add(w);
+    });
+  },
+  barrier(g, b, h) {
+    part(g, ...b, 0, h, mat(0x8a8f96, 0.9));
+    part(g, ...inset(b, -0.005), h * 0.6, h * 0.75, mat(0xe8822a, 0.6));
+  },
+  partition(g, b, h) {
+    part(g, ...b, 0.08, h, mat(0xcdb08a, 0.8));
+    const long = (b[2] - b[0]) > (b[3] - b[1]);
+    [0.15, 0.85].forEach(f => {
+      const c = long ? b[0] + (b[2] - b[0]) * f : b[1] + (b[3] - b[1]) * f;
+      const foot = long ? [c - 0.04, b[1] - 0.2, c + 0.04, b[3] + 0.2] : [b[0] - 0.2, c - 0.04, b[2] + 0.2, c + 0.04];
+      part(g, ...foot, 0, 0.08, mat(DARK));
+    });
+  },
+};
 function furniture(kind, x0, y0, x1, y1, h) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, h, y1 - y0),
-    new THREE.MeshStandardMaterial({ color: FURN[kind] ?? 0xe39a32, roughness: 0.7 }));
-  m.position.set((x0 + x1) / 2, h / 2, -(y0 + y1) / 2);
-  m.castShadow = m.receiveShadow = true;
-  m.userData.kind = kind;
-  return m;
+  const g = new THREE.Group();
+  (BUILD[kind] ?? ((gg, b, hh) => part(gg, ...b, 0, hh, mat(0xe39a32))))(g, [x0, y0, x1, y1], h);
+  g.userData.kind = kind;
+  return g;
+}
+
+// floors by room type (procedural textures: wood planks, tiles, concrete)
+function plankCanvas() {
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const g = c.getContext("2d");
+  for (let i = 0; i < 8; i++) {
+    const tone = 150 + ((i * 37) % 30);
+    g.fillStyle = `rgb(${tone + 30},${tone},${tone - 40})`; g.fillRect(0, i * 32, 256, 32);
+    g.fillStyle = "rgba(60,40,20,0.35)"; g.fillRect(0, i * 32, 256, 2);
+    g.fillRect(((i * 97) % 256), i * 32, 2, 32);
+  }
+  return c;
+}
+function tileCanvas() {
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const g = c.getContext("2d");
+  g.fillStyle = "#d9dde0"; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = "#aeb4b9"; g.lineWidth = 3;
+  for (let i = 0; i <= 256; i += 64) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke(); }
+  return c;
+}
+function concreteCanvas() {
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const g = c.getContext("2d");
+  g.fillStyle = "#9da1a4"; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(0,0,0,${(i % 7) * 0.012})`; g.fillRect((i * 53) % 256, (i * 97) % 256, 3, 3); }
+  return c;
+}
+const FLOORS = { wood: plankCanvas(), tile: tileCanvas(), concrete: concreteCanvas() };
+function floorKind(name, style) {
+  if (style === "trainhouse") return "concrete";
+  if (/^(Bad|WC|Küche|Hauswirtschaft)/.test(name)) return "tile";
+  if (/^Garage/.test(name)) return "concrete";
+  return "wood";
+}
+function roomFloors(R) {
+  (R.rooms || []).forEach(([name, x0, y0, x1, y1]) => {
+    const t = new THREE.CanvasTexture(FLOORS[floorKind(name, R.style)]);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set((x1 - x0) / 2, (y1 - y0) / 2);
+    t.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, y1 - y0).rotateX(-Math.PI / 2),
+      new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
+    m.position.set((x0 + x1) / 2, 0.004, -(y0 + y1) / 2); m.receiveShadow = true;
+    world.add(m);
+  });
 }
 
 function loadRoom(i) {
@@ -460,6 +634,7 @@ function loadRoom(i) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: 0xbfc5cc, roughness: 1 }));
   ground.position.y = -0.01; ground.receiveShadow = true; world.add(ground);
+  roomFloors(R);
   buildWalls();
   (R.obstacles || []).forEach(([x0, y0, x1, y1]) => world.add(box(x0, y0, x1, y1, 0, 1.15, "crate")));
   (R.labels || []).forEach(lb => world.add(floorLabel(lb.name, lb.x, lb.y)));

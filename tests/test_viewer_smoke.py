@@ -93,3 +93,48 @@ def test_viewer_selftest_passes(tmp_path):
     # the walk clip runs at the speed of the body (feet do not slide), within 10 %
     assert all(r["samples"] > 20 and r["footslide"] < 0.10 for r in out["runs"]), out["runs"]
     assert out["split_labels"] and out["png_bytes"] > 1000
+
+
+@pytest.mark.skipif(browser() is None, reason="no Chrome/Chromium/Edge found")
+def test_viewer_selftest_with_a_furnished_residence(tmp_path):
+    from killhouse.sim2.core import SearchParams, run_search, scenario
+    from killhouse.team import default_team
+
+    team = default_team()
+    sc = scenario(2, "residence", closed_frac=0.6)
+    run = run_search(sc, team, SearchParams(delay=1.0, max_time=4.0))
+    results = {
+        "config": {
+            "dt": 0.1,
+            "half_fov_deg": 50.0,
+            "objective": "coverage",
+            "attention_equals_heading": False,
+        },
+        "team": [o.to_dict() for o in team],
+        "rooms": [{"room": sc.ap.to_dict(), "points": sc.q.round(3).tolist(), "replays": [run]}],
+    }
+    assert {k for k, _, _ in sc.ap.fp.items} >= {"bed", "sofa", "wardrobe"}
+    page = tmp_path / "viewer.html"
+    page.write_text(to_html(results), encoding="utf-8")
+    cmd = [
+        browser(),
+        "--headless=new",
+        "--disable-gpu",
+        "--enable-unsafe-swiftshader",
+        "--use-angle=swiftshader",
+        "--no-first-run",
+        "--no-default-browser-check",
+        f"--user-data-dir={tmp_path / 'profile'}",
+        "--virtual-time-budget=60000",
+        "--dump-dom",
+        page.as_uri() + "?selftest",
+    ]
+    dom = subprocess.run(
+        cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180
+    ).stdout
+    found = re.findall(r'<pre id="selftest">(\{.*?)</pre>', dom, re.S)
+    if not found:
+        pytest.skip("no selftest output (three.js CDN unreachable or WebGL unavailable)")
+    out = json.loads(found[-1].replace("&quot;", '"').replace("&amp;", "&"))
+    assert out["ok"], out["errors"]
+    assert not any(r["nonfinite"] for r in out["runs"])

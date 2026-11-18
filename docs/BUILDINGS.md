@@ -44,7 +44,15 @@ modelled. Earlier generators (apartments, houses) treat all furniture as tall an
 - A generic type in the spirit of reconfigurable training buildings; it does not reproduce any
   real facility.
 
-## Planned
+## Viewer look
 
-Simple furniture shapes in the viewer instead of boxes. Third-party assets, if ever added, only
-under CC0 with a licence register (`THIRD_PARTY.md`) checked by a test.
+Furniture is drawn with simple shapes built from boxes and cylinders in `viewer3d.html`: beds with
+headboard and pillow, sofas with backrest, tables and desks on legs, kitchen counters with worktop
+and splashback, wardrobes, shelves, a fridge, baths, cars with bonnet, glass band, roof and
+wheels, barriers and partitions. Each piece fills exactly its simulated footprint and height;
+backs face the nearest wall. Floors follow the room type (wood planks, tiles, concrete). All
+textures are drawn by code at load time. There are no external models, textures or fonts in the
+repository.
+
+Third-party assets, if ever added, only under CC0 with a licence register (`THIRD_PARTY.md`)
+checked by a test.

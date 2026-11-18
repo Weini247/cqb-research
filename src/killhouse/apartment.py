@@ -86,6 +86,8 @@ class Apartment:
         }
         if self.style != "apartment":  # older result files keep their exact content
             out["style"] = self.style
+            # room rectangles for floors by room type in the viewer
+            out["rooms"] = [[n, *(round(v, 3) for v in r)] for n, r in self.fp.regions]
         return out
 
 

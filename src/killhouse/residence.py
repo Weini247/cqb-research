@@ -266,7 +266,7 @@ def _build(rng, seed: int) -> Apartment:
         walkable=walkable,
         windows=windows,
     )
-    return Apartment(f"VILLA{seed}", xmax, D, fp, doors, hall=idx["Diele"])
+    return Apartment(f"VILLA{seed}", xmax, D, fp, doors, hall=idx["Diele"], style="residence")
 
 
 def _furnish(rng, cells, rooms, doors, gaps, windows) -> list[tuple[str, Box, float]]:

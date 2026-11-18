@@ -8,7 +8,10 @@
   private wing, master suite, core and open-plan public wing, garage with cars, windows in
   exterior walls, typed furniture, random mirroring, guaranteed reachability.
   [docs/BUILDINGS.md](docs/BUILDINGS.md) states that all geometry is our own code.
-- Viewer: typed furniture drawn at its own height and colour.
+- Viewer: furniture shapes built in code (beds, sofas, tables, desks, counters with splashback,
+  wardrobes, shelves, fridge, baths, cars, barriers, partitions), backs facing the nearest
+  wall; floors by room type (wood, tiles, concrete) from procedural textures; room rectangles
+  in the geometry of residences and training houses. Headless selftest on a furnished house.
 - Training-house generator `trainhouse.py` (`--building trainhouse`): module grid, corridor
   bands, merged rooms, doorways and doors with loops, sparse barriers and partitions; viewer
   draws plywood walls and an observer catwalk (`style` in the geometry, older files unchanged).
