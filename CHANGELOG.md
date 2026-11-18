@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased (v0.2.1, v0.3-a to v0.3-d, start of v0.4; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+## 0.3.0 (2026-11-18): closed-loop agents, research viewer, generated buildings
+
+Exploratory; the confirmatory result is still E1 from 0.2.0, whose model is frozen and
+checked by a golden test. Contains v0.2.1, v0.3-a to v0.3-d and the first steps of v0.4
+(plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md)):
 
 - Furniture heights (`geom.SIGHT_H` = 1.2 m): `Floorplan.low` blocks bodies but not sight,
   `Floorplan.items` keeps the type and height of every piece; existing generators unchanged.
