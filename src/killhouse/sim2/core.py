@@ -24,6 +24,7 @@ from ..geom import Grid, reachable, visibility, visibility_fast
 from ..house import generate_house
 from ..residence import generate_residence
 from ..team import Operator, default_team
+from ..trainhouse import generate_trainhouse
 from .agents import HOLD, MOVE, OPEN, WAIT, AgentState, Limits, turn_towards, wrap
 from .perception import DWELL_STEPS, in_view
 from .policy import attention_goal, choose_target
@@ -64,8 +65,12 @@ class Scenario:
 
 def scenario(seed: int, building: str = "apartment", closed_frac: float = 0.0) -> Scenario:
     """A generated apartment or house with its visibility matrix and closed-door masks."""
-    if building in ("house", "residence"):
-        make = generate_house if building == "house" else generate_residence
+    if building in ("house", "residence", "trainhouse"):
+        make = {
+            "house": generate_house,
+            "residence": generate_residence,
+            "trainhouse": generate_trainhouse,
+        }[building]
         ap = make(seed, closed_frac=closed_frac)
         grid = Grid(ap.fp)
         q = ap.fp.points()
@@ -401,7 +406,9 @@ def main(argv: list[str] | None = None) -> None:
         default=["0", "1", "none"],
         help="message delays in seconds, 'none' = no communication",
     )
-    ap.add_argument("--building", choices=("apartment", "house", "residence"), default="apartment")
+    ap.add_argument(
+        "--building", choices=("apartment", "house", "residence", "trainhouse"), default="apartment"
+    )
     ap.add_argument("--closed", type=float, default=0.6, help="share of doors closed at the start")
     ap.add_argument("--out", type=Path, default=Path("out/search"))
     a = ap.parse_args(argv)

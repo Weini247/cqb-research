@@ -9,6 +9,9 @@
   exterior walls, typed furniture, random mirroring, guaranteed reachability.
   [docs/BUILDINGS.md](docs/BUILDINGS.md) states that all geometry is our own code.
 - Viewer: typed furniture drawn at its own height and colour.
+- Training-house generator `trainhouse.py` (`--building trainhouse`): module grid, corridor
+  bands, merged rooms, doorways and doors with loops, sparse barriers and partitions; viewer
+  draws plywood walls and an observer catwalk (`style` in the geometry, older files unchanged).
 
 - sim2 doors and threats: doors start closed (`--closed`, default 0.6), block sight until an
   agent has opened them (0.8 s, mode `öffnet Tür`); every run is scored afterwards with the

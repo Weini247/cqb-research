@@ -10,6 +10,7 @@ general design rules only. Reference images people look at for inspiration are n
 | apartments | `apartment.py` | hallway with rooms on both sides, living area, closed doors, pass-through, wardrobes | apartment study, sim2 |
 | houses | `house.py` | 8-12 rooms on a long hallway or an entry hall with cross corridor, open-plan openings | sim2 |
 | residences | `residence.py` | single-family houses by zones (below) | sim2 |
+| training houses | `trainhouse.py` | generic modular layout (below) | sim2 |
 
 ## Residences (`residence.py`)
 
@@ -30,9 +31,20 @@ Furniture lower than 1.2 m blocks bodies but not sight: a standing observer (eye
 pieces block both. This is a modelling choice; crouching people and partial cover are not
 modelled. Earlier generators (apartments, houses) treat all furniture as tall and are unchanged.
 
+## Training houses (`trainhouse.py`)
+
+- **Module grid:** square modules of 2.8-3.2 m in 4-6 columns and 3-4 rows, one or two corridor
+  bands of 1.4 m between the rows and sometimes a corridor column; neighbouring modules are merged
+  into larger rooms at random (7-21 rooms).
+- **Links:** a spanning tree from the entrance with open doorways or doors (never a door opening
+  into a corridor), plus extra links between rooms for loops.
+- **Furniture:** sparse low barriers and tall partitions.
+- **Viewer:** plywood-style walls and a see-through observer catwalk on top of the walls, drawn
+  only (`"style": "trainhouse"` in the geometry), not part of the simulation.
+- A generic type in the spirit of reconfigurable training buildings; it does not reproduce any
+  real facility.
+
 ## Planned
 
-A modular training-house generator (grid of small rooms and corridors, plywood-style walls,
-little furniture) as a generic type, not a copy of any real facility, and simple furniture
-shapes in the viewer instead of boxes. Third-party assets, if ever added, only under CC0 with a
-licence register (`THIRD_PARTY.md`) checked by a test.
+Simple furniture shapes in the viewer instead of boxes. Third-party assets, if ever added, only
+under CC0 with a licence register (`THIRD_PARTY.md`) checked by a test.

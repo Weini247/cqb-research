@@ -57,6 +57,8 @@ moved). Field of view, dwell and clearing threshold are taken from E1 (`entry.py
 - Houses (`--building house`): on 12 generated houses x 2 conditions (messages after 1 s, none)
   all 24 runs reached 99.5 % coverage within 240 s; with messages the team needed 31-75 s,
   without 70-162 s. Exploratory, development seeds only.
+- Training houses (`--building trainhouse`, 50 % closed doors): 16 of 16 runs on 8 seeds
+  reached 99.5 % coverage; without messages the team needed about twice as long.
 - Residences (`--building residence`, 60 % closed doors): on 8 seeds x 2 conditions, 15 of 16
   runs reached 99.5 % coverage; low furniture lets agents see across rooms but makes them
   walk around it.

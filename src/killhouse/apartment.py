@@ -43,6 +43,7 @@ class Apartment:
     fp: Floorplan
     doors: list[Door]
     hall: int = 0
+    style: str = "apartment"  # drawing style in the viewer ("trainhouse": plywood, catwalk)
 
     @property
     def entrance(self) -> Door:
@@ -64,7 +65,7 @@ class Apartment:
         else:
             boxes += [[*b, "crate"] for b in self.fp.furniture]
         boxes += [[*b, "window"] for b in self.fp.windows]
-        return {
+        out = {
             "name": self.name,
             "bounds": list(self.fp.bounds),
             "boxes": [[round(v, 3) if isinstance(v, float) else v for v in b] for b in boxes],
@@ -83,6 +84,9 @@ class Apartment:
                 for d in self.doors
             ],
         }
+        if self.style != "apartment":  # older result files keep their exact content
+            out["style"] = self.style
+        return out
 
 
 def _r(rng, lo, hi, step=0.25):

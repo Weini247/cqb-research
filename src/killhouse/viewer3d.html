@@ -156,6 +156,7 @@ const CANVASES = {
   wall: gridCanvas("#e6e6e3", "#cfcfcb", "#a4a4a0"),
   crate: gridCanvas("#e39a32", "#d18a28", "#a8681a"),
   door: gridCanvas("#b9bdc4", "#a9adb4", "#8c9098"),
+  plywood: gridCanvas("#cdb08a", "#bf9f78", "#9c7c55"),  // training house panels
 };
 function gridMat(kind, sx, sy, extra = {}) {
   const t = new THREE.CanvasTexture(CANVASES[kind]);
@@ -397,9 +398,24 @@ function buildWalls() {
   if (R.boxes) {
     const height = { wall: H, door: Math.min(2.0, H), crate: Math.min(1.8, H), window: Math.min(1.0, H) };
     // typed furniture carries its own height; it is drawn at full height regardless of the wall slider
+    const wallTex = R.style === "trainhouse" ? "plywood" : "wall";
     R.boxes.forEach(([x0, y0, x1, y1, kind, h]) => wallGroup.add(h != null
       ? furniture(kind, x0, y0, x1, y1, h)
-      : box(x0, y0, x1, y1, 0, height[kind], kind === "door" || kind === "window" ? "wall" : kind)));
+      : box(x0, y0, x1, y1, 0, height[kind], kind === "door" || kind === "window" || kind === "wall" ? wallTex : kind)));
+    if (R.style === "trainhouse") {
+      // observer catwalk on top of the walls: a see-through grating, drawn only, not simulated
+      const grate = new THREE.MeshStandardMaterial({ color: 0x3a3f46, transparent: true, opacity: 0.55,
+        roughness: 0.8, metalness: 0.4, depthWrite: false });
+      R.boxes.filter(b => b[4] === "wall" && Math.max(b[2] - b[0], b[3] - b[1]) > 1.2).forEach(([x0, y0, x1, y1]) => {
+        const along = x1 - x0 > y1 - y0, w = 0.7;
+        const gx0 = along ? x0 : (x0 + x1) / 2 - w / 2, gx1 = along ? x1 : (x0 + x1) / 2 + w / 2;
+        const gy0 = along ? (y0 + y1) / 2 - w / 2 : y0, gy1 = along ? (y0 + y1) / 2 + w / 2 : y1;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(gx1 - gx0, 0.04, gy1 - gy0), grate);
+        m.position.set((gx0 + gx1) / 2, H + 0.03, -(gy0 + gy1) / 2);
+        m.renderOrder = 3;
+        wallGroup.add(m);
+      });
+    }
     doorMeshes = (R.doors || []).map(d => {
       const panel = box(...d.gap, 0, Math.min(2.0, H), "door");
       const leaf = box(...d.leaf, 0, Math.min(2.0, H), "door");
@@ -421,7 +437,7 @@ function buildWalls() {
 }
 
 // typed furniture (residence generator): a simple solid per kind, coloured by material
-const FURN = { bed: 0x8fa3c4, sofa: 0x7d8f7a, table: 0xa8835a, desk: 0xa8835a, counter: 0xd9d4cc,
+const FURN = { barrier: 0x6b6f75, partition: 0xcdb08a, bed: 0x8fa3c4, sofa: 0x7d8f7a, table: 0xa8835a, desk: 0xa8835a, counter: 0xd9d4cc,
   island: 0xd9d4cc, wardrobe: 0xc9b79c, shelf: 0xb89a74, fridge: 0xe6e8ea, car: 0x9aa4b0, bath: 0xf2f4f5,
   cabinet: 0xc9b79c };
 function furniture(kind, x0, y0, x1, y1, h) {
