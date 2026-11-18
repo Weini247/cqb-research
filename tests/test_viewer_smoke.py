@@ -138,3 +138,4 @@ def test_viewer_selftest_with_a_furnished_residence(tmp_path):
     out = json.loads(found[-1].replace("&quot;", '"').replace("&amp;", "&"))
     assert out["ok"], out["errors"]
     assert not any(r["nonfinite"] for r in out["runs"])
+    assert out["models"] >= 3  # the embedded CC0 models were parsed and used

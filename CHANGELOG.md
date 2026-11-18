@@ -8,6 +8,10 @@
   private wing, master suite, core and open-plan public wing, garage with cars, windows in
   exterior walls, typed furniture, random mirroring, guaranteed reachability.
   [docs/BUILDINGS.md](docs/BUILDINGS.md) states that all geometry is our own code.
+- CC0 models (Kenney Furniture Kit 2.0, Car Kit 3.1; 19 files) for furniture and cars in the
+  viewer, fitted to the simulated footprints, own shapes as fallback and via the button
+  "Modelle"; licence register `THIRD_PARTY.md` with checksums, original licence texts in
+  `licenses/`, checked by `tests/test_third_party.py`.
 - Viewer: furniture shapes built in code (beds, sofas, tables, desks, counters with splashback,
   wardrobes, shelves, fridge, baths, cars, barriers, partitions), backs facing the nearest
   wall; floors by room type (wood, tiles, concrete) from procedural textures; room rectangles

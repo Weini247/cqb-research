@@ -126,3 +126,7 @@ verified procedures.
 ## Licence
 
 [MIT](LICENSE). If you use the code or the results, please cite it ([CITATION.cff](CITATION.cff)).
+
+The furniture and car models in `src/killhouse/assets/` are by Kenney (www.kenney.nl) under
+CC0 1.0; every file is listed with source and checksum in [THIRD_PARTY.md](THIRD_PARTY.md), the
+original licence texts are in [licenses/](licenses/).

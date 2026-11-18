@@ -51,6 +51,7 @@
   <div id="metrics" class="row muted"></div>
   <div id="team" class="row"></div>
   <div id="agentinfo" class="row" style="display:none"></div>
+  <div id="credit" class="row muted" style="font-size:11px"></div>
   <div class="row muted">rot = ungesicherte Bedrohungsposition · grün = gesichert · Fächer = Blickkegel</div>
   <div class="row muted">Figuren rot/orange/grau = eine Beispiel-Platzierung: unentdeckt / entdeckt / identifiziert</div>
   <div class="row" style="color:#f3c46b;font-size:12px">Abstraktes Simulationsmodell. Technik-Namen bezeichnen
@@ -68,12 +69,14 @@
   <button id="cam-oblique" class="on">Schräg</button><button id="cam-top">Draufsicht</button><button id="cam-follow">Folgen</button><button id="cam-cine">Kino</button>
   <button id="fov" class="on">Blickkegel</button><button id="ray" class="on">Blickrichtung</button>
   <button id="png" title="Standbild speichern">PNG</button><button id="rec" title="Durchlauf als Video aufnehmen">● Video</button>
+  <button id="models" class="on" title="Möbel und Autos als CC0-Modelle (Kenney) oder als einfache Formen">Modelle</button>
   <button id="fig" title="Kapsel = Modellansicht (exakter simulierter Körper, keine Zierbewegung)">Figur: animiert</button>
 </div>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const DOC = /*__DATA__*/null;  // killhouse.replay/2, see docs/CONVENTIONS.md
 const D = adapt(DOC);
@@ -570,9 +573,66 @@ const BUILD = {
     });
   },
 };
+// ---------- CC0 models (Kenney, see THIRD_PARTY.md), embedded by viewer3d.py ----------
+const MODEL_DATA = /*__MODELS__*/null;
+const MODELS = {};
+let useModels = true;
+const modelsReady = (async () => {
+  if (!MODEL_DATA || !Object.keys(MODEL_DATA).length) return;
+  const manager = new THREE.LoadingManager();
+  const colormap = MODEL_DATA["car-colormap.png"];
+  manager.setURLModifier(u => (u.endsWith("colormap.png") && colormap ? "data:image/png;base64," + colormap : u));
+  const loader = new GLTFLoader(manager);
+  const bin = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+  await Promise.all(Object.entries(MODEL_DATA).filter(([n]) => n.endsWith(".glb")).map(([n, b64]) =>
+    new Promise(done => loader.parse(bin(b64), "", gl => { MODELS[n.slice(0, -4)] = gl.scene; done(); }, () => done()))));
+})();
+// a model fitted exactly into footprint b and height h; its back (-z in the model) faces `back`
+function placeModel(g, name, b, h, back) {
+  const tpl = MODELS[name];
+  if (!tpl) return false;
+  const inner = tpl.clone(true);
+  inner.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+  const holder = new THREE.Group(); holder.add(inner);
+  holder.rotation.y = [Math.PI, 0, Math.PI / 2, -Math.PI / 2][back];
+  holder.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(holder), size = box.getSize(new THREE.Vector3());
+  const c = box.getCenter(new THREE.Vector3());
+  holder.position.set(-c.x, -box.min.y, -c.z);
+  const outer = new THREE.Group(); outer.add(holder);
+  outer.scale.set((b[2] - b[0]) / size.x, h / size.y, (b[3] - b[1]) / size.z);
+  outer.position.set((b[0] + b[2]) / 2, 0, -(b[1] + b[3]) / 2);
+  g.add(outer);
+  return true;
+}
+function modelFor(kind, g, b, h) {
+  const w = b[2] - b[0], d = b[3] - b[1], long = w > d;
+  if (kind === "bed") return placeModel(g, Math.min(w, d) >= 1.2 ? "bedDouble" : "bedSingle", b, h, backSide(b, long ? [2, 3] : [0, 1]));
+  if (kind === "sofa") return placeModel(g, Math.max(w, d) >= 2.2 ? "loungeSofaLong" : "loungeSofa", b, h, backSide(b));
+  if (kind === "table") return placeModel(g, h < 0.6 ? "tableCoffee" : "table", b, h, long ? 0 : 2);
+  if (kind === "counter") {  // a row of cabinets along the wall, the sink in the middle
+    const back = backSide(b), along = back <= 1, len = along ? w : d, n = Math.max(1, Math.round(len / 0.6));
+    for (let k = 0; k < n; k++) {
+      const a = (along ? b[0] : b[1]) + (len * k) / n, e = a + len / n;
+      const seg = along ? [a, b[1], e, b[3]] : [b[0], a, b[2], e];
+      if (!placeModel(g, k === Math.floor(n / 2) && n > 2 ? "kitchenSink" : "kitchenCabinet", seg, h, back)) return false;
+    }
+    return true;
+  }
+  if (kind === "car") {
+    const names = ["sedan", "suv", "hatchback-sports"];
+    return placeModel(g, names[Math.round(Math.abs(b[0] * 7 + b[1] * 3)) % names.length], b, h, d > w ? 1 : 2);
+  }
+  const single = { desk: "desk", island: "kitchenBar", fridge: "kitchenFridgeLarge", shelf: "bookcaseOpen",
+    wardrobe: "bookcaseClosedDoors", bath: "bathtub", cabinet: "bathroomCabinetDrawer" }[kind];
+  return single ? placeModel(g, single, b, h, backSide(b)) : false;
+}
 function furniture(kind, x0, y0, x1, y1, h) {
-  const g = new THREE.Group();
-  (BUILD[kind] ?? ((gg, b, hh) => part(gg, ...b, 0, hh, mat(0xe39a32))))(g, [x0, y0, x1, y1], h);
+  const g = new THREE.Group(), b = [x0, y0, x1, y1];
+  if (!(useModels && modelFor(kind, g, b, h))) {
+    g.clear();
+    (BUILD[kind] ?? ((gg, bb, hh) => part(gg, ...bb, 0, hh, mat(0xe39a32))))(g, b, h);
+  }
   g.userData.kind = kind;
   return g;
 }
@@ -917,7 +977,16 @@ window.killhouse = {  // console / recording hooks
 resize();
 const start = Math.max(0, D.rooms.findIndex(r => r.room.name === "L-corner" || r.room.boxes));
 $("room").value = start; loadRoom(start);
-if (new URLSearchParams(location.search).has("selftest")) selftest();
+$("models").onclick = () => {
+  useModels = !useModels; $("models").classList.toggle("on", useModels); buildWalls();
+};
+modelsReady.then(() => {
+  if (Object.keys(MODELS).length) {
+    buildWalls();
+    $("credit").textContent = "Möbel und Autos: Kenney (CC0), siehe THIRD_PARTY.md";
+  } else $("models").style.display = "none";
+});
+if (new URLSearchParams(location.search).has("selftest")) modelsReady.then(selftest);
 else requestAnimationFrame(frame);
 
 // ?selftest: steps through every run with every camera, figure style and the split view and writes
@@ -948,6 +1017,8 @@ function selftest() {
     Object.keys(FIGURES).forEach(f => { figureStyle = f; loadTech(0); window.killhouse.renderAt(1, DT); });
     out.split_labels = $("la").textContent.length > 0 && $("lb").textContent.length > 0;
     out.png_bytes = window.killhouse.snap().length;
+    out.models = Object.keys(MODELS).length;
+    useModels = !useModels; buildWalls(); useModels = !useModels; buildWalls();  // both furniture looks
   } catch (e) { out.ok = false; out.errors.push(String(e && e.stack || e)); }
   out.ok = out.ok && out.errors.length === 0;
   const pre = document.createElement("pre"); pre.id = "selftest"; pre.textContent = JSON.stringify(out);
