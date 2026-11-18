@@ -396,8 +396,10 @@ function buildWalls() {
   const R = room.room, H = +$("wallh").value;
   if (R.boxes) {
     const height = { wall: H, door: Math.min(2.0, H), crate: Math.min(1.8, H), window: Math.min(1.0, H) };
-    R.boxes.forEach(([x0, y0, x1, y1, kind]) =>
-      wallGroup.add(box(x0, y0, x1, y1, 0, height[kind], kind === "door" || kind === "window" ? "wall" : kind)));
+    // typed furniture carries its own height; it is drawn at full height regardless of the wall slider
+    R.boxes.forEach(([x0, y0, x1, y1, kind, h]) => wallGroup.add(h != null
+      ? furniture(kind, x0, y0, x1, y1, h)
+      : box(x0, y0, x1, y1, 0, height[kind], kind === "door" || kind === "window" ? "wall" : kind)));
     doorMeshes = (R.doors || []).map(d => {
       const panel = box(...d.gap, 0, Math.min(2.0, H), "door");
       const leaf = box(...d.leaf, 0, Math.min(2.0, H), "door");
@@ -416,6 +418,19 @@ function buildWalls() {
   add(dx1, -T, w + ext, 0, 0, H, "wall");
   if (H > 2.1) add(dx0, -T, dx1, 0, 2.1, H, "wall");
   add(-ext, back - T, w + ext, back, 0, Math.min(H, 1.0), "wall");
+}
+
+// typed furniture (residence generator): a simple solid per kind, coloured by material
+const FURN = { bed: 0x8fa3c4, sofa: 0x7d8f7a, table: 0xa8835a, desk: 0xa8835a, counter: 0xd9d4cc,
+  island: 0xd9d4cc, wardrobe: 0xc9b79c, shelf: 0xb89a74, fridge: 0xe6e8ea, car: 0x9aa4b0, bath: 0xf2f4f5,
+  cabinet: 0xc9b79c };
+function furniture(kind, x0, y0, x1, y1, h) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, h, y1 - y0),
+    new THREE.MeshStandardMaterial({ color: FURN[kind] ?? 0xe39a32, roughness: 0.7 }));
+  m.position.set((x0 + x1) / 2, h / 2, -(y0 + y1) / 2);
+  m.castShadow = m.receiveShadow = true;
+  m.userData.kind = kind;
+  return m;
 }
 
 function loadRoom(i) {

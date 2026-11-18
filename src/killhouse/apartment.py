@@ -59,7 +59,10 @@ class Apartment:
 
     def to_dict(self) -> dict:
         boxes = [[*b, "wall"] for b in self.fp.walls]
-        boxes += [[*b, "crate"] for b in self.fp.furniture]
+        if self.fp.items:  # typed furniture with heights (residence generator)
+            boxes += [[*b, kind, h] for kind, b, h in self.fp.items]
+        else:
+            boxes += [[*b, "crate"] for b in self.fp.furniture]
         boxes += [[*b, "window"] for b in self.fp.windows]
         return {
             "name": self.name,

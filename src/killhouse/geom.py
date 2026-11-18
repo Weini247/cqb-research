@@ -16,6 +16,9 @@ import numpy as np
 from .room import Box, _seg_hits_box
 
 OBS_RES = 0.25
+# Furniture lower than this blocks bodies but not sight: a standing observer (eyes at about
+# 1.6 m) still sees the upper body of a standing person behind a sofa, table or counter.
+SIGHT_H = 1.2
 
 
 @dataclass
@@ -27,6 +30,9 @@ class Floorplan:
     regions: list[tuple[str, Box]] = field(default_factory=list)  # name, interior rect
     walkable: list[Box] = field(default_factory=list)  # areas bodies/observers may occupy at all
     windows: list[Box] = field(default_factory=list)  # block bodies, not sight (pass-throughs)
+    low: list[Box] = field(default_factory=list)  # furniture below SIGHT_H: blocks bodies only
+    # all furniture for drawing: (kind, box, height in m); tall pieces are also in `furniture`
+    items: list[tuple[str, Box, float]] = field(default_factory=list)
     threat_r: float = 0.25
     point_res: float = 0.3
 
@@ -52,7 +58,7 @@ class Floorplan:
                 pts.append(np.stack(np.meshgrid(xs, ys), -1).reshape(-1, 2))
         p = np.concatenate(pts)
         keep = np.ones(len(p), bool)
-        for x0, y0, x1, y1 in self.doors + self.furniture:
+        for x0, y0, x1, y1 in self.doors + self.furniture + self.low:
             keep &= ~(
                 (p[:, 0] > x0 - m) & (p[:, 0] < x1 + m) & (p[:, 1] > y0 - m) & (p[:, 1] < y1 + m)
             )
@@ -95,7 +101,7 @@ class Grid:
             return m
 
         self.see_free = ~blocked(0.0)  # an observer can stand here (not inside a wall)
-        self.walk_free = ~blocked(inflate, fp.windows)  # a body centre can be here
+        self.walk_free = ~blocked(inflate, list(fp.windows) + list(fp.low))  # a body centre
         self.region = fp.region_of(self.centers)
         # a body centre can round to a cell inside a wall or door leaf (0.25 m grid); such cells
         # borrow the visibility of the nearest free cell instead of being blind

@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased (v0.2.1 and v0.3-a to v0.3-d; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+## Unreleased (v0.2.1, v0.3-a to v0.3-d, start of v0.4; plan in [docs/PLAN_v0.3.md](docs/PLAN_v0.3.md))
+
+- Furniture heights (`geom.SIGHT_H` = 1.2 m): `Floorplan.low` blocks bodies but not sight,
+  `Floorplan.items` keeps the type and height of every piece; existing generators unchanged.
+- Residence generator `residence.py` (`killhouse-search --building residence`): zones with
+  private wing, master suite, core and open-plan public wing, garage with cars, windows in
+  exterior walls, typed furniture, random mirroring, guaranteed reachability.
+  [docs/BUILDINGS.md](docs/BUILDINGS.md) states that all geometry is our own code.
+- Viewer: typed furniture drawn at its own height and colour.
 
 - sim2 doors and threats: doors start closed (`--closed`, default 0.6), block sight until an
   agent has opened them (0.8 s, mode `öffnet Tür`); every run is scored afterwards with the

@@ -22,6 +22,7 @@ from ..clearing import OPEN_TIME, Episode, closed_door_masks, door_xy, evaluate_
 from ..entry import CLEAR_FRAC, DT, HALF_FOV
 from ..geom import Grid, reachable, visibility, visibility_fast
 from ..house import generate_house
+from ..residence import generate_residence
 from ..team import Operator, default_team
 from .agents import HOLD, MOVE, OPEN, WAIT, AgentState, Limits, turn_towards, wrap
 from .perception import DWELL_STEPS, in_view
@@ -63,8 +64,9 @@ class Scenario:
 
 def scenario(seed: int, building: str = "apartment", closed_frac: float = 0.0) -> Scenario:
     """A generated apartment or house with its visibility matrix and closed-door masks."""
-    if building == "house":
-        ap = generate_house(seed, closed_frac=closed_frac)
+    if building in ("house", "residence"):
+        make = generate_house if building == "house" else generate_residence
+        ap = make(seed, closed_frac=closed_frac)
         grid = Grid(ap.fp)
         q = ap.fp.points()
         vis = visibility_fast(ap.fp, grid, q)
@@ -101,7 +103,7 @@ def run_search(sc: Scenario, team: list[Operator], params: SearchParams) -> dict
     starts = start_positions(sc, n)
     allowed = reachable(g, starts[0])  # pockets behind furniture or door leaves are no targets
     cand = np.nonzero(allowed)[0]
-    boxes = np.array(sc.ap.fp.blockers, float)
+    boxes = np.array(sc.ap.fp.blockers + sc.ap.fp.low, float)  # bodies also avoid low furniture
     # doors: closed ones block sight until an agent has spent OPEN_TIME at them; everybody
     # knows the floorplan and which doors are still closed
     closed = dict(sc.closed)
@@ -365,7 +367,7 @@ def results(
     rooms = []
     for seed in seeds:
         sc = scenario(seed, building, closed_frac)
-        horizon = 240.0 if building == "house" else 120.0  # houses take longer
+        horizon = 120.0 if building == "apartment" else 240.0  # houses take longer
         runs = [run_search(sc, team, SearchParams(delay=d, max_time=horizon)) for d in delays]
         rooms.append(
             {
@@ -399,7 +401,7 @@ def main(argv: list[str] | None = None) -> None:
         default=["0", "1", "none"],
         help="message delays in seconds, 'none' = no communication",
     )
-    ap.add_argument("--building", choices=("apartment", "house"), default="apartment")
+    ap.add_argument("--building", choices=("apartment", "house", "residence"), default="apartment")
     ap.add_argument("--closed", type=float, default=0.6, help="share of doors closed at the start")
     ap.add_argument("--out", type=Path, default=Path("out/search"))
     a = ap.parse_args(argv)

@@ -57,7 +57,9 @@ moved). Field of view, dwell and clearing threshold are taken from E1 (`entry.py
 - Houses (`--building house`): on 12 generated houses x 2 conditions (messages after 1 s, none)
   all 24 runs reached 99.5 % coverage within 240 s; with messages the team needed 31-75 s,
   without 70-162 s. Exploratory, development seeds only.
-- No threats and no risk: the outcome is coverage over time, not the E1 duel model.
+- Residences (`--building residence`, 60 % closed doors): on 8 seeds x 2 conditions, 15 of 16
+  runs reached 99.5 % coverage; low furniture lets agents see across rooms but makes them
+  walk around it.
 - On 8 development apartments x 3 delays, 23 of 24 runs reached 99.5 % coverage; one run without
   communication ended in a standoff. Deadlocks between bodies are reduced, not excluded.
 - Whether messages make the team faster varies between apartments in this first version (the
